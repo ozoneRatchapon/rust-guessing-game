@@ -10,7 +10,6 @@
  * Run:  npx tsx scripts/play-phase2-devnet.ts
  */
 
-import * as anchor from "@anchor-lang/core";
 import { Program, AnchorProvider, Wallet } from "@anchor-lang/core";
 import {
   Connection,
@@ -188,21 +187,6 @@ function sleep(ms: number): Promise<void> {
 
 // ─── Transaction helpers ──────────────────────────────────────────────────────
 
-async function sendAndLog(
-  connection: Connection,
-  tx: Transaction,
-  signers: Keypair[],
-  label: string
-): Promise<string> {
-  const sig = await sendAndConfirmTransaction(connection, tx, signers, {
-    commitment: "confirmed",
-    skipPreflight: false,
-  });
-  console.log(ok(`  [${label}]  Transaction confirmed!`));
-  console.log(`  ${C.bold}Explorer:${C.reset} ${link(explorerUrl(sig))}`);
-  return sig;
-}
-
 async function doCloseGame(
   program: Phase2VrfProgram,
   keypair: Keypair,
@@ -240,9 +224,13 @@ async function main() {
   console.log(banner("============================================"));
   console.log();
   console.log(dim("How it works:"));
-  console.log(dim("  1. Initialize with Switchboard VRF randomness commitment"));
+  console.log(
+    dim("  1. Initialize with Switchboard VRF randomness commitment")
+  );
   console.log(dim("  2. Wait ~3s for oracle to generate randomness"));
-  console.log(dim("  3. Settle randomness on-chain (secret determined by VRF)"));
+  console.log(
+    dim("  3. Settle randomness on-chain (secret determined by VRF)")
+  );
   console.log(dim("  4. YOU guess the number (1-100)"));
   console.log(dim("  5. You have 10 attempts"));
   console.log();
@@ -313,7 +301,9 @@ async function main() {
     `${C.bold}[SETUP]${C.reset}  Switchboard PID: ${sbProgramId.toBase58()}`
   );
   console.log(
-    `${C.bold}[SETUP]${C.reset}  Switchboard Queue: ${SWITCHBOARD_QUEUE.toBase58()}`
+    `${C.bold}[SETUP]${
+      C.reset
+    }  Switchboard Queue: ${SWITCHBOARD_QUEUE.toBase58()}`
   );
   console.log();
 
@@ -364,9 +354,7 @@ async function main() {
       await doCloseGame(program, keypair, gamePda, adminPk);
       // Fall through to create new game below
     } else if (!existingGame.isRevealed) {
-      console.log(
-        warn("  Game exists but randomness not settled yet.")
-      );
+      console.log(warn("  Game exists but randomness not settled yet."));
       const settle = await askYesNo(rl, "  Try to settle now? [Y/n]: ");
       if (settle) {
         // Reconstruct randomness instance from existing account
@@ -410,9 +398,7 @@ async function main() {
   console.log(
     `${C.bold}[INITIALIZE]${C.reset}  Creating game with Switchboard VRF...`
   );
-  console.log(
-    dim("  The secret number will be determined by VRF randomness.")
-  );
+  console.log(dim("  The secret number will be determined by VRF randomness."));
 
   try {
     // 1. Create randomness account + commit instructions
@@ -424,9 +410,7 @@ async function main() {
     rngAccount = rng;
     rngKp = kp;
 
-    console.log(
-      dim(`  Randomness account: ${rngAccount.pubkey.toBase58()}`)
-    );
+    console.log(dim(`  Randomness account: ${rngAccount.pubkey.toBase58()}`));
 
     // 2. Build our initialize instruction
     const initIx = await program.methods
@@ -663,9 +647,7 @@ async function guessLoop(
     } else if (guessNum > gameState.secretNumber) {
       console.log(
         warn(
-          `  >> ${guessNum} is too big! (${
-            maxTries - gameState.attempts
-          } left)`
+          `  >> ${guessNum} is too big! (${maxTries - gameState.attempts} left)`
         )
       );
     }
