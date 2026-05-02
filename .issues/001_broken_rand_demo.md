@@ -25,6 +25,17 @@ The teaching guide (`docs/on-chain-randomness-lesson.md`) explains *why* `rand` 
 - [ ] Error message is captured and documented
 - [ ] Doc links back to the teaching guide's explanation
 
+### Demo Script
+
+A TypeScript runner `scripts/build-broken-rand.ts` that:
+1. Runs `cargo build-sbf --manifest-path on-chain/programs/broken-rand/Cargo.toml`
+2. Captures stderr
+3. Displays the error with highlighted key lines
+4. Prints a summary: "This is why `rand` cannot be used on Solana"
+5. Links to `docs/on-chain-randomness-lesson.md` for the full explanation
+
+Can also be run via `./scripts/demo.sh 4`.
+
 ## Refs
 
 - `docs/on-chain-randomness-lesson.md` — Section on why `rand` breaks consensus

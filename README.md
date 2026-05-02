@@ -4,6 +4,19 @@ A guessing game that started as a CLI toy and is evolving into an **on-chain Sol
 
 ---
 
+## Demos
+
+| # | Demo | Command | What |
+|---|------|---------|------|
+| 1 | Pure Rust CLI | `cargo run` | Original guessing game (Rust Book Ch.2) |
+| 2 | Phase 1: Commit-Reveal | `cd on-chain && npx tsx scripts/play-devnet.ts` | Anchor program, admin commit-reveal on devnet |
+| 3 | Phase 2: Switchboard VRF | `cd on-chain && npx tsx scripts/play-phase2-devnet.ts` | Trustless VRF randomness on devnet |
+| 4 | Broken `rand` Proof | `cd on-chain && npx tsx scripts/build-broken-rand.ts` | `cargo build-sbf` fails = proof |
+
+Or use the launcher: `cd on-chain && bash scripts/demo.sh`
+
+---
+
 ## CLI Version
 
 The original game, built from [The Rust Book Chapter 2](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html).
@@ -52,14 +65,15 @@ Instead, we use a **VRF oracle** (like Switchboard) that generates randomness of
 3. **Player** submits guesses -- the program responds with "too small", "too big", or "you win!"
 4. Game tracks attempts and enforces a 10-try limit
 
-> In Phase 2, step 1-2 will be replaced by a VRF oracle for trustless randomness.
+> Phase 2 is a **separate program** (`phase2-vrf`) that uses a VRF oracle for trustless randomness. Phase 1 stays deployed and demo-able.
 
 ### Build Phases
 
 | Phase | What | Status |
 |-------|------|--------|
-| **Phase 1** | Core game with Anchor (commit-reveal for the secret, no VRF yet) | Done |
-| **Phase 2** | Upgrade to Switchboard VRF for real on-chain randomness | Planned |
+| **Phase 1** | Commit-reveal with Anchor | Done |
+| **Phase 2** | Switchboard VRF (separate program) | In Progress |
+| **Bonus** | Broken `rand` demo | Planned |
 
 ### How to Build and Test
 
@@ -81,7 +95,8 @@ Each phase has its own playable experience:
 | Mode | Command | Network | Explorer |
 |------|---------|---------|----------|
 | Local (LiteSVM) | `cargo run --manifest-path on-chain/programs/on-chain/Cargo.toml --features play --bin play` | In-memory VM | No |
-| Devnet (Explorer) | `cd on-chain && yarn play:devnet` | Devnet | Yes |
+| Devnet Phase 1 | `cd on-chain && npx tsx scripts/play-devnet.ts` | Devnet | Yes |
+| Devnet Phase 2 | `cd on-chain && npx tsx scripts/play-phase2-devnet.ts` | Devnet | Yes |
 
 **Local mode** uses LiteSVM -- instant, no network needed. Runs the actual compiled BPF program.
 
@@ -94,18 +109,27 @@ https://explorer.solana.com/tx/<SIGNATURE>?cluster=devnet
 
 ```
 on-chain/
-  programs/on-chain/src/
-    lib.rs                          # Program entry (initialize, reveal, guess)
-    state.rs                        # Game account + event structs
-    error.rs                        # GameError enum (7 error codes)
-    constants.rs                    # MAX_TRIES=10, range 1-100
-    instructions/
-      initialize.rs                 # Admin creates game, commits blake3 hash
-      reveal.rs                     # Admin reveals secret, program verifies hash
-      guess.rs                      # Player guesses, program responds
-      close_game.rs                 # Admin closes game, recovers rent
-  programs/on-chain/tests/
-    test_initialize.rs              # 8 tests (init, reveal, guess, security)
+  programs/
+    on-chain/            ← Phase 1 (commit-reveal)
+      src/
+        lib.rs                          # Program entry (initialize, reveal, guess)
+        state.rs                        # Game account + event structs
+        error.rs                        # GameError enum (7 error codes)
+        constants.rs                    # MAX_TRIES=10, range 1-100
+        instructions/
+          initialize.rs                 # Admin creates game, commits blake3 hash
+          reveal.rs                     # Admin reveals secret, program verifies hash
+          guess.rs                      # Player guesses, program responds
+          close_game.rs                 # Admin closes game, recovers rent
+      tests/
+        test_initialize.rs              # 8 tests (init, reveal, guess, security)
+    phase2-vrf/            ← Phase 2 (Switchboard VRF)
+    broken-rand/           ← Demo: proves rand fails on-chain
+  scripts/
+    play-devnet.ts                    ← Phase 1 interactive script
+    play-phase2-devnet.ts             ← Phase 2 interactive script
+    build-broken-rand.ts              ← Build broken-rand, shows error
+    demo.sh                           ← Menu launcher for all demos
 ```
 
 ### Instructions
@@ -138,7 +162,15 @@ solana program show --url devnet 3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT
 - **Max 10 attempts**: Game auto-finishes when attempts exhausted.
 - **Admin-only reveal**: Only the game admin can reveal the secret.
 
-> Note: Phase 1 uses a trust-on-admin model. Phase 2 replaces this with Switchboard VRF for trustless randomness.
+> Note: Phase 1 uses a trust-on-admin model. Phase 2 is a **separate program** (`phase2-vrf`) that uses Switchboard VRF for trustless randomness. Both programs coexist on devnet.
+
+### Architecture Decision: Why Phase 2 Is Separate
+
+Phase 2 lives in its own Anchor program (`phase2-vrf`), not as an upgrade to Phase 1. Here's why:
+
+- **Phase 1 stays demo-able forever** -- already deployed on devnet, students can interact with it at any time
+- **Different instructions** -- Phase 2 drops `reveal` (admin reveals secret) and adds `settle_random` (VRF callback). The instruction set is fundamentally different
+- **Side-by-side teaching** -- students see both approaches (commit-reveal vs. VRF) and understand the trade-offs
 
 ### Cost to Play
 
