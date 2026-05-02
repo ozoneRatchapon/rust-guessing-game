@@ -81,8 +81,11 @@ Instead, we use a **VRF oracle** (like Switchboard) that generates randomness of
 # Build the on-chain program (BPF)
 cargo build-sbf --manifest-path on-chain/programs/on-chain/Cargo.toml
 
-# Run all tests (8 tests using LiteSVM)
+# Run Phase 1 tests (8 tests using LiteSVM)
 cargo test --manifest-path on-chain/programs/on-chain/Cargo.toml
+
+# Run Phase 2 tests (16 tests using LiteSVM with mocked Switchboard)
+cargo test --manifest-path on-chain/programs/phase2-vrf/Cargo.toml
 
 # Generate IDL (needed for devnet play script)
 cd on-chain && anchor build --skip-lint
@@ -124,6 +127,8 @@ on-chain/
       tests/
         test_initialize.rs              # 8 tests (init, reveal, guess, security)
     phase2-vrf/            ← Phase 2 (Switchboard VRF)
+      tests/
+        test_phase2.rs                  # 16 tests (init, settle, guess, security, mock VRF)
   demos/
     broken-rand/           ← Standalone program: proves rand fails on-chain
   scripts/
