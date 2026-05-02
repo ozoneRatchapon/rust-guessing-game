@@ -52,7 +52,10 @@ Phase 2 is a **separate Anchor program** (`phase2-vrf`), not a replacement of Ph
 ### Tests
 
 - Phase 1: 8 LiteSVM tests (all passing)
-- Phase 2: No tests yet (needs LiteSVM mocking of randomness account)
+- Phase 2: 16 LiteSVM tests (all passing, mocked Switchboard randomness)
+
+Phase 2 tests mock the Switchboard `RandomnessAccountData` by constructing fake account data
+with the correct discriminator, a known `value` byte, and `reveal_slot` synced to `svm.warp_to_slot()`.
 
 ## The Plan / How to Run
 
@@ -98,7 +101,6 @@ This order tells a story: "here's the problem → here's why → here's the simp
 
 ## Remain Work
 
-- [ ] Phase 2 LiteSVM tests (mock randomness account data)
 - [ ] Demo dry-run / rehearsal
 - [ ] Consider adding a `play:phase2:local` feature for offline Phase 2 testing
 - [ ] Optional: add cost analysis for Phase 2 transactions

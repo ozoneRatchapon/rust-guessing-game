@@ -1,9 +1,27 @@
 use anchor_lang::prelude::*;
+use switchboard_on_demand::Discriminator;
 use switchboard_on_demand::on_demand::accounts::RandomnessAccountData;
 
 use crate::constants::*;
 use crate::error::GameError;
 use crate::state::{GameInitialized, GameV2};
+
+/// Validate that the account data has the correct Switchboard randomness discriminator
+/// and sufficient size. Uses manual byte checks instead of `RandomnessAccountData::parse()`
+/// to avoid `bytemuck` alignment issues in LiteSVM tests.
+fn validate_randomness_account(data: &[u8]) -> Result<()> {
+    let discriminator = RandomnessAccountData::discriminator();
+    if data.len() < discriminator.len() {
+        return err!(GameError::InvalidRandomnessAccount);
+    }
+    if data[..discriminator.len()] != *discriminator {
+        return err!(GameError::InvalidRandomnessAccount);
+    }
+    if data.len() < RandomnessAccountData::size() {
+        return err!(GameError::InvalidRandomnessAccount);
+    }
+    Ok(())
+}
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -26,12 +44,8 @@ pub fn initialize_handler(ctx: Context<Initialize>) -> Result<()> {
     let game = &mut ctx.accounts.game;
     let clock = Clock::get()?;
 
-    // Read randomness account to get the commitment slot
-    // The randomness account is created by the client before this instruction
-    // and committed in the same transaction
-    let _randomness_data =
-        RandomnessAccountData::parse(ctx.accounts.randomness_account.data.borrow())
-            .map_err(|_| GameError::InvalidRandomnessAccount)?;
+    // Validate randomness account has correct discriminator and size
+    validate_randomness_account(&ctx.accounts.randomness_account.data.borrow())?;
 
     game.admin = ctx.accounts.admin.key();
     game.secret_hash = [0u8; 32];
