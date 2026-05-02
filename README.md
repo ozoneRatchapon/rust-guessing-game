@@ -182,6 +182,8 @@ Phase 2 lives in its own Anchor program (`phase2-vrf`), not as an upgrade to Pha
 
 Every transaction costs a flat 5,000 lamports fee (~$0.00075 at $150/SOL).
 
+#### Phase 1: Commit-Reveal
+
 | Action | Fee | Compute Units |
 |--------|----:|--------------:|
 | close_game | 5,000 lamports | ~3,858 |
@@ -190,6 +192,17 @@ Every transaction costs a flat 5,000 lamports fee (~$0.00075 at $150/SOL).
 | guess | 5,000 lamports | ~2,770 |
 
 Rent for the game account (78 bytes) is ~0.0014 SOL, fully recoverable via `close_game`. A full game session (5 guesses) costs ~0.00004 SOL in fees — less than a penny.
+
+#### Phase 2: Switchboard VRF
+
+| Action | Fee | Compute Units | Notes |
+|--------|----:|--------------:|-------|
+| initialize | 10,000 lamports | ~121,148 | Includes Switchboard VRF instruction |
+| settle_random | 5,000 lamports | ~49,836 | VRF reveal + secret derivation |
+| guess | 5,000 lamports | ~2,992 | Per guess |
+| close_game | 5,000 lamports | ~5,396 | Rent recovery |
+
+Phase 2 `initialize` is a multi-instruction transaction: it creates a Switchboard randomness account and then calls our `initialize` instruction in the same transaction, hence the double fee (10,000 lamports). A full Phase 2 session (init + settle + 5 guesses + close) costs ~0.00006 SOL in fees.
 
 ### What It Teaches
 
