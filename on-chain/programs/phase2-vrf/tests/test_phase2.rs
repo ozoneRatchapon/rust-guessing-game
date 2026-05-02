@@ -297,12 +297,16 @@ fn setup_full_game(secret_value_byte: u8) -> (LiteSVM, Keypair, Keypair, Pubkey,
 /// Verifies: admin stored, hash=0 (not settled yet), secret=0, randomness pubkey saved, defaults correct.
 #[test]
 fn test_initialize() {
+    eprintln!("\n━━━ test_initialize ━━━");
+
+    // Step 1: Setup SVM and create randomness account
     let (mut svm, admin, program_id) = setup_svm();
     let game_pda = get_game_pda(&admin.pubkey(), &program_id);
     let randomness_keypair = Keypair::new();
-
     create_randomness_account_in_svm(&mut svm, &randomness_keypair.pubkey(), 41);
+    eprintln!("  Step 1: Setup SVM + fake randomness account (value_byte=41)");
 
+    // Step 2: Send initialize instruction
     let init_ix = build_initialize_ix(
         &program_id,
         &admin.pubkey(),
@@ -311,7 +315,9 @@ fn test_initialize() {
     );
     let res = send_ix(&mut svm, init_ix, &admin);
     assert!(res.is_ok(), "Initialize should succeed");
+    eprintln!("  Step 2: initialize → OK");
 
+    // Step 3: Verify game state after initialization
     let game = read_game(&svm, &game_pda);
     assert_eq!(game.admin, admin.pubkey());
     assert_eq!(game.secret_hash, [0u8; 32]);
@@ -321,19 +327,27 @@ fn test_initialize() {
     assert_eq!(game.max_tries, 10);
     assert!(!game.is_finished);
     assert_eq!(game.randomness_account, randomness_keypair.pubkey());
+    eprintln!(
+        "  Step 3: Verified — admin set, secret_hash=[0;32], is_revealed=false, attempts=0, max_tries=10, is_finished=false"
+    );
+    eprintln!("  ✓ test_initialize passed");
 }
 
 /// Test: Settle randomness with value_byte=41 → secret=(41%100)+1=42.
 /// Verifies: is_revealed=true, secret_number=42, blake3(42) hash stored correctly.
 #[test]
 fn test_settle_random() {
+    eprintln!("\n━━━ test_settle_random ━━━");
+
+    // Step 1: Setup SVM and create randomness account with value_byte=41
     let (mut svm, admin, program_id) = setup_svm();
     let game_pda = get_game_pda(&admin.pubkey(), &program_id);
     let randomness_keypair = Keypair::new();
     let secret_value_byte: u8 = 41; // secret = (41 % 100) + 1 = 42
-
     create_randomness_account_in_svm(&mut svm, &randomness_keypair.pubkey(), secret_value_byte);
+    eprintln!("  Step 1: Setup SVM + fake randomness account (value_byte=41)");
 
+    // Step 2: Initialize game
     let init_ix = build_initialize_ix(
         &program_id,
         &admin.pubkey(),
@@ -341,10 +355,16 @@ fn test_settle_random() {
         &randomness_keypair.pubkey(),
     );
     send_ix(&mut svm, init_ix, &admin).unwrap();
+    eprintln!("  Step 2: initialize → OK");
 
-    // Warp to settle slot
+    // Step 3: Warp to SETTLE_SLOT
     svm.warp_to_slot(SETTLE_SLOT);
+    eprintln!(
+        "  Step 3: Warped to slot {} (matches reveal_slot)",
+        SETTLE_SLOT
+    );
 
+    // Step 4: Settle randomness
     let settle_ix = build_settle_random_ix(
         &program_id,
         &admin.pubkey(),
@@ -353,7 +373,9 @@ fn test_settle_random() {
     );
     let res = send_ix(&mut svm, settle_ix, &admin);
     assert!(res.is_ok(), "Settle random should succeed");
+    eprintln!("  Step 4: settle_random → OK, secret=(41%100)+1=42");
 
+    // Step 5: Verify game state
     let game = read_game(&svm, &game_pda);
     assert!(game.is_revealed);
     assert_eq!(game.secret_number, 42);
@@ -361,18 +383,23 @@ fn test_settle_random() {
     // Verify blake3 hash
     let expected_hash = blake3::hash(&42u8.to_le_bytes());
     assert_eq!(game.secret_hash, *expected_hash.as_bytes());
+    eprintln!("  Step 5: Verified — is_revealed=true, secret=42, hash=blake3(42)");
+    eprintln!("  ✓ test_settle_random passed");
 }
 
 /// Test: Settle with various value bytes to ensure secret derivation is always in [1,100].
 /// Tests bytes: 0, 1, 99, 100, 150, 200, 255 — covers edge cases around modulo.
 #[test]
 fn test_settle_random_boundary_values() {
-    // Test multiple value bytes to ensure secret derivation is correct
+    eprintln!("\n━━━ test_settle_random_boundary_values ━━━");
+
+    // Step 1: Test multiple value bytes to ensure secret derivation is correct
     for value_byte in [0u8, 1, 99, 100, 150, 200, 255] {
         let (mut svm, admin, program_id) = setup_svm();
         let game_pda = get_game_pda(&admin.pubkey(), &program_id);
         let randomness_keypair = Keypair::new();
         let expected = expected_secret(value_byte);
+        eprintln!("  Testing value_byte={value_byte} → expected secret={expected}");
 
         create_randomness_account_in_svm(&mut svm, &randomness_keypair.pubkey(), value_byte);
 
@@ -404,82 +431,121 @@ fn test_settle_random_boundary_values() {
             "secret must be in [1,100], got {}",
             game.secret_number
         );
+        eprintln!("    ✓ value_byte={value_byte} → secret={expected} (in [1,100])");
     }
+    eprintln!("  Step 1: All 7 boundary values verified");
+    eprintln!("  ✓ test_settle_random_boundary_values passed");
 }
 
 /// Test: Player guesses the exact secret (42) → game finished, 1 attempt.
 #[test]
 fn test_guess_correct() {
-    // value_byte=41 → secret=(41%100)+1=42
+    eprintln!("\n━━━ test_guess_correct ━━━");
+
+    // Step 1: Setup full game with value_byte=41 → secret=(41%100)+1=42
     let (mut svm, _admin, player, program_id, game_pda, secret) = setup_full_game(41);
     assert_eq!(secret, 42);
+    eprintln!("  Step 1: Setup full game (secret={secret})");
 
+    // Step 2: Guess the exact secret
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 42);
     let res = send_ix(&mut svm, guess_ix, &player);
     assert!(res.is_ok());
+    eprintln!("  Step 2: guess(42) → OK");
 
+    // Step 3: Verify game is finished with 1 attempt
     let game = read_game(&svm, &game_pda);
     assert!(game.is_finished);
     assert_eq!(game.attempts, 1);
+    eprintln!("  Step 3: Verified — is_finished=true, attempts=1");
+    eprintln!("  ✓ test_guess_correct passed");
 }
 
 /// Test: Player guesses below the secret (10 < 50) → game continues, 1 attempt.
 #[test]
 fn test_guess_too_small() {
-    // value_byte=149 → secret=(149%100)+1=50
+    eprintln!("\n━━━ test_guess_too_small ━━━");
+
+    // Step 1: Setup full game with value_byte=149 → secret=(149%100)+1=50
     let (mut svm, _admin, player, program_id, game_pda, secret) = setup_full_game(149);
     assert_eq!(secret, 50);
+    eprintln!("  Step 1: Setup full game (secret={secret})");
 
+    // Step 2: Guess below the secret
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 10);
     let res = send_ix(&mut svm, guess_ix, &player);
     assert!(res.is_ok());
+    eprintln!("  Step 2: guess(10) → OK (too small)");
 
+    // Step 3: Verify game continues with 1 attempt
     let game = read_game(&svm, &game_pda);
     assert!(!game.is_finished);
     assert_eq!(game.attempts, 1);
+    eprintln!("  Step 3: Verified — is_finished=false, attempts=1");
+    eprintln!("  ✓ test_guess_too_small passed");
 }
 
 /// Test: Player guesses above the secret (90 > 50) → game continues, 1 attempt.
 #[test]
 fn test_guess_too_big() {
-    // value_byte=149 → secret=(149%100)+1=50
+    eprintln!("\n━━━ test_guess_too_big ━━━");
+
+    // Step 1: Setup full game with value_byte=149 → secret=(149%100)+1=50
     let (mut svm, _admin, player, program_id, game_pda, secret) = setup_full_game(149);
     assert_eq!(secret, 50);
+    eprintln!("  Step 1: Setup full game (secret={secret})");
 
+    // Step 2: Guess above the secret
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 90);
     let res = send_ix(&mut svm, guess_ix, &player);
     assert!(res.is_ok());
+    eprintln!("  Step 2: guess(90) → OK (too big)");
 
+    // Step 3: Verify game continues with 1 attempt
     let game = read_game(&svm, &game_pda);
     assert!(!game.is_finished);
     assert_eq!(game.attempts, 1);
+    eprintln!("  Step 3: Verified — is_finished=false, attempts=1");
+    eprintln!("  ✓ test_guess_too_big passed");
 }
 
 /// Test: 10 wrong guesses → game finished, 11th guess rejected.
 #[test]
 fn test_guess_game_over() {
-    // value_byte=41 → secret=42, guess 1 ten times → game over
-    let (mut svm, _admin, player, program_id, game_pda, _secret) = setup_full_game(41);
+    eprintln!("\n━━━ test_guess_game_over ━━━");
 
+    // Step 1: Setup full game with value_byte=41 → secret=42, guess 1 ten times → game over
+    let (mut svm, _admin, player, program_id, game_pda, _secret) = setup_full_game(41);
+    eprintln!("  Step 1: Setup full game (secret=42)");
+
+    // Step 2: Make 10 wrong guesses (all guess=1)
     for i in 0..10 {
         let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 1);
         let res = send_ix(&mut svm, guess_ix, &player);
         assert!(res.is_ok(), "Guess iteration {i} should succeed");
+        eprintln!("  Step 2.{i}: guess(1) → OK (attempt {}/10)", i + 1);
     }
 
+    // Step 3: Verify game is finished after 10 attempts
     let game = read_game(&svm, &game_pda);
     assert!(game.is_finished);
     assert_eq!(game.attempts, 10);
+    eprintln!("  Step 3: Verified — is_finished=true, attempts=10");
 
-    // 11th guess should fail
+    // Step 4: 11th guess should fail
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 1);
     let res = send_ix(&mut svm, guess_ix, &player);
     assert!(res.is_err(), "11th guess should fail");
+    eprintln!("  Step 4: guess(1) [11th attempt] → ERR (game over)");
+    eprintln!("  ✓ test_guess_game_over passed");
 }
 
 /// Test: Player guesses BEFORE settle_random → rejected (secret not determined yet).
 #[test]
 fn test_guess_before_settle_fails() {
+    eprintln!("\n━━━ test_guess_before_settle_fails ━━━");
+
+    // Step 1: Setup SVM and initialize game (no settle)
     let (mut svm, admin, program_id) = setup_svm();
     let game_pda = get_game_pda(&admin.pubkey(), &program_id);
     let randomness_keypair = Keypair::new();
@@ -493,19 +559,25 @@ fn test_guess_before_settle_fails() {
         &randomness_keypair.pubkey(),
     );
     send_ix(&mut svm, init_ix, &admin).unwrap();
+    eprintln!("  Step 1: Setup SVM + initialize game (no settle)");
 
-    // Try to guess WITHOUT settling randomness
+    // Step 2: Try to guess WITHOUT settling randomness
     let player = Keypair::new();
     svm.airdrop(&player.pubkey(), 1_000_000_000).unwrap();
 
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 42);
     let res = send_ix(&mut svm, guess_ix, &player);
     assert!(res.is_err(), "Guess before settle should fail");
+    eprintln!("  Step 2: guess(42) without settle → ERR (expected)");
+    eprintln!("  ✓ test_guess_before_settle_fails passed");
 }
 
 /// Test: Non-admin tries to settle randomness → rejected.
 #[test]
 fn test_unauthorized_settle() {
+    eprintln!("\n━━━ test_unauthorized_settle ━━━");
+
+    // Step 1: Setup SVM and initialize game
     let (mut svm, admin, program_id) = setup_svm();
     let game_pda = get_game_pda(&admin.pubkey(), &program_id);
     let randomness_keypair = Keypair::new();
@@ -519,10 +591,13 @@ fn test_unauthorized_settle() {
         &randomness_keypair.pubkey(),
     );
     send_ix(&mut svm, init_ix, &admin).unwrap();
+    eprintln!("  Step 1: Setup SVM + initialize game");
 
+    // Step 2: Warp to settle slot
     svm.warp_to_slot(SETTLE_SLOT);
+    eprintln!("  Step 2: Warped to slot {}", SETTLE_SLOT);
 
-    // Impostor tries to settle
+    // Step 3: Impostor tries to settle
     let impostor = Keypair::new();
     svm.airdrop(&impostor.pubkey(), 1_000_000_000).unwrap();
 
@@ -534,11 +609,16 @@ fn test_unauthorized_settle() {
     );
     let res = send_ix(&mut svm, settle_ix, &impostor);
     assert!(res.is_err(), "Non-admin settle should fail");
+    eprintln!("  Step 3: impostor settle → ERR (expected)");
+    eprintln!("  ✓ test_unauthorized_settle passed");
 }
 
 /// Test: Settle randomness twice → second settle rejected (AlreadyRevealed).
 #[test]
 fn test_double_settle_fails() {
+    eprintln!("\n━━━ test_double_settle_fails ━━━");
+
+    // Step 1: Setup SVM and initialize game
     let (mut svm, admin, program_id) = setup_svm();
     let game_pda = get_game_pda(&admin.pubkey(), &program_id);
     let randomness_keypair = Keypair::new();
@@ -552,10 +632,13 @@ fn test_double_settle_fails() {
         &randomness_keypair.pubkey(),
     );
     send_ix(&mut svm, init_ix, &admin).unwrap();
+    eprintln!("  Step 1: Setup SVM + initialize game");
 
+    // Step 2: Warp to settle slot
     svm.warp_to_slot(SETTLE_SLOT);
+    eprintln!("  Step 2: Warped to slot {}", SETTLE_SLOT);
 
-    // First settle succeeds
+    // Step 3: First settle succeeds
     let settle_ix = build_settle_random_ix(
         &program_id,
         &admin.pubkey(),
@@ -564,71 +647,103 @@ fn test_double_settle_fails() {
     );
     let res = send_ix(&mut svm, settle_ix.clone(), &admin);
     assert!(res.is_ok(), "First settle should succeed");
+    eprintln!("  Step 3: First settle → OK");
 
-    // Second settle fails
+    // Step 4: Second settle fails
     let res = send_ix(&mut svm, settle_ix, &admin);
     assert!(res.is_err(), "Double settle should fail");
+    eprintln!("  Step 4: Second settle → ERR (expected)");
+    eprintln!("  ✓ test_double_settle_fails passed");
 }
 
 /// Test: Guess outside valid range (0 or 101) → rejected (InvalidGuessRange).
 #[test]
 fn test_invalid_guess_range() {
-    let (mut svm, _admin, player, program_id, game_pda, _secret) = setup_full_game(41);
+    eprintln!("\n━━━ test_invalid_guess_range ━━━");
 
-    // Guess 0 (below range)
+    // Step 1: Setup full game
+    let (mut svm, _admin, player, program_id, game_pda, _secret) = setup_full_game(41);
+    eprintln!("  Step 1: Setup full game (secret=42)");
+
+    // Step 2: Guess 0 (below range)
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 0);
     let res = send_ix(&mut svm, guess_ix, &player);
     assert!(res.is_err(), "Guess 0 should fail (below range)");
+    eprintln!("  Step 2: guess(0) → ERR (below range)");
 
-    // Guess 101 (above range)
+    // Step 3: Guess 101 (above range)
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 101);
     let res = send_ix(&mut svm, guess_ix, &player);
     assert!(res.is_err(), "Guess 101 should fail (above range)");
+    eprintln!("  Step 3: guess(101) → ERR (above range)");
+    eprintln!("  ✓ test_invalid_guess_range passed");
 }
 
 /// Test: Close game → account deleted, rent recovered to admin.
 #[test]
 fn test_close_game() {
+    eprintln!("\n━━━ test_close_game ━━━");
+
+    // Step 1: Setup full game
     let (mut svm, admin, _player, program_id, game_pda, _secret) = setup_full_game(41);
-
     let admin_balance_before = svm.get_balance(&admin.pubkey());
+    eprintln!(
+        "  Step 1: Setup full game, admin balance={}",
+        admin_balance_before.unwrap_or(0)
+    );
 
+    // Step 2: Close game
     let close_ix = build_close_game_ix(&program_id, &admin.pubkey(), &game_pda);
     let res = send_ix(&mut svm, close_ix, &admin);
     assert!(res.is_ok(), "Close game should succeed");
+    eprintln!("  Step 2: close_game → OK");
 
-    // Game account should be gone
+    // Step 3: Verify game account is gone
     let account = svm.get_account(&game_pda);
     assert!(account.is_none(), "Game account should be closed");
+    eprintln!("  Step 3: Verified — game account is None (closed)");
 
-    // Admin should have recovered rent (minus tx fee)
+    // Step 4: Verify admin recovered rent
     let admin_balance_after = svm.get_balance(&admin.pubkey());
     assert!(
         admin_balance_after > admin_balance_before,
         "Admin should recover rent lamports"
     );
+    eprintln!(
+        "  Step 4: Admin balance after={} (recovered rent)",
+        admin_balance_after.unwrap_or(0)
+    );
+    eprintln!("  ✓ test_close_game passed");
 }
 
 /// Test: Non-admin tries to close game → rejected (wrong PDA derivation).
 #[test]
 fn test_unauthorized_close() {
+    eprintln!("\n━━━ test_unauthorized_close ━━━");
+
+    // Step 1: Setup full game and create impostor
     let (mut svm, _admin, _player, program_id, _game_pda, _secret) = setup_full_game(41);
 
     let impostor = Keypair::new();
     svm.airdrop(&impostor.pubkey(), 1_000_000_000).unwrap();
+    eprintln!("  Step 1: Setup full game + funded impostor");
 
-    // The close_game instruction uses PDA seeds with admin key, so impostor can't close it.
-    // Using impostor as admin parameter derives a different PDA which doesn't have a game.
+    // Step 2: Impostor tries to close with wrong PDA derivation
     let impostor_game_pda = get_game_pda(&impostor.pubkey(), &program_id);
 
     let close_ix = build_close_game_ix(&program_id, &impostor.pubkey(), &impostor_game_pda);
     let res = send_ix(&mut svm, close_ix, &impostor);
     assert!(res.is_err(), "Impostor close should fail");
+    eprintln!("  Step 2: impostor close_game → ERR (expected)");
+    eprintln!("  ✓ test_unauthorized_close passed");
 }
 
 /// Test: Settle with a different randomness account than stored during init → rejected.
 #[test]
 fn test_wrong_randomness_account_fails() {
+    eprintln!("\n━━━ test_wrong_randomness_account_fails ━━━");
+
+    // Step 1: Setup SVM with real and fake randomness accounts
     let (mut svm, admin, program_id) = setup_svm();
     let game_pda = get_game_pda(&admin.pubkey(), &program_id);
     let randomness_keypair = Keypair::new();
@@ -636,7 +751,9 @@ fn test_wrong_randomness_account_fails() {
 
     create_randomness_account_in_svm(&mut svm, &randomness_keypair.pubkey(), 41);
     create_randomness_account_in_svm(&mut svm, &fake_randomness_keypair.pubkey(), 41);
+    eprintln!("  Step 1: Setup SVM + real + fake randomness accounts");
 
+    // Step 2: Initialize game with real randomness account
     let init_ix = build_initialize_ix(
         &program_id,
         &admin.pubkey(),
@@ -644,10 +761,13 @@ fn test_wrong_randomness_account_fails() {
         &randomness_keypair.pubkey(),
     );
     send_ix(&mut svm, init_ix, &admin).unwrap();
+    eprintln!("  Step 2: initialize with real randomness pubkey → OK");
 
+    // Step 3: Warp to settle slot
     svm.warp_to_slot(SETTLE_SLOT);
+    eprintln!("  Step 3: Warped to slot {}", SETTLE_SLOT);
 
-    // Try to settle with wrong randomness account
+    // Step 4: Try to settle with wrong randomness account
     let settle_ix = build_settle_random_ix(
         &program_id,
         &admin.pubkey(),
@@ -656,11 +776,16 @@ fn test_wrong_randomness_account_fails() {
     );
     let res = send_ix(&mut svm, settle_ix, &admin);
     assert!(res.is_err(), "Wrong randomness account should fail");
+    eprintln!("  Step 4: settle with fake randomness → ERR (expected)");
+    eprintln!("  ✓ test_wrong_randomness_account_fails passed");
 }
 
 /// Test: Settle WITHOUT warping to SETTLE_SLOT → rejected (clock slot ≠ reveal_slot).
 #[test]
 fn test_randomness_not_ready_fails() {
+    eprintln!("\n━━━ test_randomness_not_ready_fails ━━━");
+
+    // Step 1: Setup SVM and initialize game
     let (mut svm, admin, program_id) = setup_svm();
     let game_pda = get_game_pda(&admin.pubkey(), &program_id);
     let randomness_keypair = Keypair::new();
@@ -674,11 +799,17 @@ fn test_randomness_not_ready_fails() {
         &randomness_keypair.pubkey(),
     );
     send_ix(&mut svm, init_ix, &admin).unwrap();
+    eprintln!("  Step 1: Setup SVM + initialize game");
 
-    // Don't warp — clock slot won't match reveal_slot
+    // Step 2: Don't warp — clock slot won't match reveal_slot
     // The randomness account has reveal_slot=SETTLE_SLOT(200)
     // but svm is at slot ~0
+    eprintln!(
+        "  Step 2: Skipped warp — svm slot still ~0 (reveal_slot={})",
+        SETTLE_SLOT
+    );
 
+    // Step 3: Settle should fail
     let settle_ix = build_settle_random_ix(
         &program_id,
         &admin.pubkey(),
@@ -687,52 +818,63 @@ fn test_randomness_not_ready_fails() {
     );
     let res = send_ix(&mut svm, settle_ix, &admin);
     assert!(res.is_err(), "Settle without slot match should fail");
+    eprintln!("  Step 3: settle_random without warp → ERR (expected)");
+    eprintln!("  ✓ test_randomness_not_ready_fails passed");
 }
 
 /// Test: Complete game session — init → settle → 3 wrong guesses → win → close.
 /// Simulates a real player experience end-to-end.
 #[test]
 fn test_full_game_session() {
-    // Simulate a complete game: init → settle → multiple guesses → win → close
-    let (mut svm, admin, player, program_id, game_pda, secret) = setup_full_game(99);
-    // value_byte=99 → secret=(99%100)+1=100
-    assert_eq!(secret, 100);
+    eprintln!("\n━━━ test_full_game_session ━━━");
 
-    // Guess 50 → too small
+    // Step 1: Setup full game with value_byte=99 → secret=(99%100)+1=100
+    let (mut svm, admin, player, program_id, game_pda, secret) = setup_full_game(99);
+    assert_eq!(secret, 100);
+    eprintln!("  Step 1: Setup full game (secret=100)");
+
+    // Step 2: Guess 50 → too small
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 50);
     send_ix(&mut svm, guess_ix, &player).unwrap();
     let game = read_game(&svm, &game_pda);
     assert!(!game.is_finished);
     assert_eq!(game.attempts, 1);
+    eprintln!("  Step 2: guess(50) → TOO SMALL (secret=100), attempts=1");
 
-    // Guess 75 → too small
+    // Step 3: Guess 75 → too small
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 75);
     send_ix(&mut svm, guess_ix, &player).unwrap();
     let game = read_game(&svm, &game_pda);
     assert!(!game.is_finished);
     assert_eq!(game.attempts, 2);
+    eprintln!("  Step 3: guess(75) → TOO SMALL (secret=100), attempts=2");
 
-    // Guess 90 → too small
+    // Step 4: Guess 90 → too small
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 90);
     send_ix(&mut svm, guess_ix, &player).unwrap();
     let game = read_game(&svm, &game_pda);
     assert!(!game.is_finished);
     assert_eq!(game.attempts, 3);
+    eprintln!("  Step 4: guess(90) → TOO SMALL (secret=100), attempts=3");
 
-    // Guess 100 → correct!
+    // Step 5: Guess 100 → correct!
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 100);
     send_ix(&mut svm, guess_ix, &player).unwrap();
     let game = read_game(&svm, &game_pda);
     assert!(game.is_finished);
     assert_eq!(game.attempts, 4);
+    eprintln!("  Step 5: guess(100) → CORRECT! is_finished=true, attempts=4");
 
-    // Guess after finish should fail
+    // Step 6: Guess after finish should fail
     let guess_ix = build_guess_ix(&program_id, &player.pubkey(), &game_pda, 50);
     let res = send_ix(&mut svm, guess_ix, &player);
     assert!(res.is_err(), "Guess after finish should fail");
+    eprintln!("  Step 6: guess(50) after finish → ERR (expected)");
 
-    // Close game
+    // Step 7: Close game
     let close_ix = build_close_game_ix(&program_id, &admin.pubkey(), &game_pda);
     let res = send_ix(&mut svm, close_ix, &admin);
     assert!(res.is_ok(), "Close should succeed");
+    eprintln!("  Step 7: close_game → OK");
+    eprintln!("  ✓ test_full_game_session passed");
 }

@@ -33,7 +33,7 @@ run_tests() {
     echo -e "\n${CYAN}${BOLD}━━━ ${label} ━━━${RESET}"
     echo -e "${DIM}  manifest: ${manifest}${RESET}\n"
 
-    if cargo test --manifest-path "${manifest}" --quiet 2>&1; then
+    if cargo test --manifest-path "${manifest}" --quiet -- --nocapture 2>&1; then
         pass=$((pass + 1))
         echo -e "\n${GREEN}✓ ${label} passed${RESET}"
     else
