@@ -124,7 +124,8 @@ on-chain/
       tests/
         test_initialize.rs              # 8 tests (init, reveal, guess, security)
     phase2-vrf/            ← Phase 2 (Switchboard VRF)
-    broken-rand/           ← Demo: proves rand fails on-chain
+  demos/
+    broken-rand/           ← Standalone program: proves rand fails on-chain
   scripts/
     play-devnet.ts                    ← Phase 1 interactive script
     play-phase2-devnet.ts             ← Phase 2 interactive script

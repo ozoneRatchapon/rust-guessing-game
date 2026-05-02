@@ -1,3 +1,5 @@
+[workspace]
+
 [package]
 name = "broken-rand"
 version = "0.1.0"
@@ -21,7 +23,6 @@ custom-panic = []
 
 [dependencies]
 anchor-lang = "1.0.1"
-getrandom = { workspace = true }
 rand = "0.8"
 
 [lints.rust]
