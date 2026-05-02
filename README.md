@@ -103,6 +103,7 @@ on-chain/
       initialize.rs                 # Admin creates game, commits blake3 hash
       reveal.rs                     # Admin reveals secret, program verifies hash
       guess.rs                      # Player guesses, program responds
+      close_game.rs                 # Admin closes game, recovers rent
   programs/on-chain/tests/
     test_initialize.rs              # 8 tests (init, reveal, guess, security)
 ```
@@ -114,6 +115,7 @@ on-chain/
 | `initialize(secret_number)` | Admin | Creates game PDA, stores `blake3(secret)` as commitment |
 | `reveal(secret_number)` | Admin | Reveals the secret, program verifies hash matches commitment |
 | `guess(guess)` | Anyone | Submits a guess (1-100), gets too-small/too-big/correct response |
+| `close_game()` | Admin | Closes game account, recovers rent lamports to admin |
 
 ### Deploy to Devnet
 
@@ -137,6 +139,19 @@ solana program show --url devnet 3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT
 - **Admin-only reveal**: Only the game admin can reveal the secret.
 
 > Note: Phase 1 uses a trust-on-admin model. Phase 2 replaces this with Switchboard VRF for trustless randomness.
+
+### Cost to Play
+
+Every transaction costs a flat 5,000 lamports fee (~$0.00075 at $150/SOL).
+
+| Action | Fee | Compute Units |
+|--------|----:|--------------:|
+| close_game | 5,000 lamports | ~3,858 |
+| initialize | 5,000 lamports | ~10,018 |
+| reveal | 5,000 lamports | ~5,435 |
+| guess | 5,000 lamports | ~2,770 |
+
+Rent for the game account (78 bytes) is ~0.0014 SOL, fully recoverable via `close_game`. A full game session (5 guesses) costs ~0.00004 SOL in fees — less than a penny.
 
 ### What It Teaches
 

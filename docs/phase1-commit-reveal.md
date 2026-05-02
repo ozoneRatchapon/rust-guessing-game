@@ -30,6 +30,7 @@ on-chain/programs/on-chain/src/
     initialize.rs     # Create game, store blake3 hash of secret
     reveal.rs         # Admin reveals secret, program verifies hash
     guess.rs          # Player guesses, program compares and emits events
+    close_game.rs     # Admin closes game, recovers rent
 ```
 
 ### Account Layout
@@ -72,7 +73,16 @@ initialize(secret_number)     reveal(secret_number)     guess(guess)
   is_finished = false         is_finished unchanged     Auto-finish at 10
 ```
 
-**Order matters:** `initialize` -> `reveal` -> `guess`. You cannot guess before the secret is revealed.
+```
+close_game()                 (optional, admin only)
+        |
+        v
+  Admin closes game
+  Account deleted
+  Rent recovered to admin
+```
+
+**Order matters:** `initialize` -> `reveal` -> `guess`. You cannot guess before the secret is revealed. `close_game` is optional and can be called at any point by the admin to clean up and recover rent.
 
 ---
 
@@ -218,6 +228,37 @@ if game.attempts >= game.max_tries && !game.is_finished {
 
 ---
 
+### close_game()
+
+**Purpose:** Admin closes the game account, recovering the rent-exempt lamports back to their wallet. This is needed to re-initialize a new game at the same PDA.
+
+**Account validation:**
+
+- `game` -- mutable, closed via Anchor's `close` constraint. PDA seeds `[b"game", admin.key()]` with bump.
+- `admin` -- must be a signer. Receives the recovered rent lamports.
+
+**Security check:**
+
+The Anchor `close = admin` constraint handles lamport transfer and zeroing the account data. The program also checks that the signer is the game's original admin.
+
+**When to use:**
+
+- After a game is finished and you want to start a new one at the same PDA.
+- The `initialize` instruction uses Anchor's `init` constraint, which requires the account to not exist yet. If the account exists, you must close it first.
+
+**Cost:** 5,000 lamports fee. The rent (~1,428,760 lamports for 78 bytes) is returned to the admin.
+
+### Instructions Summary
+
+| Instruction | Who | Description |
+|-------------|-----|-------------|
+| initialize() | Admin | Creates game account, stores blake3 hash of secret |
+| reveal() | Admin | Reveals secret, verifies hash matches commitment |
+| guess() | Anyone | Submits guess, emits too small / too big / correct event |
+| close_game() | Admin | Closes game account, recovers rent to admin |
+
+---
+
 ## Security Model
 
 ### What commit-reveal prevents
@@ -347,6 +388,42 @@ The `play.rs` binary:
 - Parses transaction logs to show feedback (too small / too big / correct).
 - Reads your guesses from stdin.
 
+### Re-initializing (Devnet)
+
+When you run `yarn play:devnet` and a game already exists at your PDA, the script asks:
+
+```
+  Re-initialize (overwrite)? [y/N]:
+```
+
+- **`y`**: Closes the old game account (recovers rent), then creates a fresh game. Costs 2 extra transactions (~0.00001 SOL in fees).
+- **`N`**: Continues the existing game where you left off. Useful if your session was interrupted mid-game. Doesn't work if the game is already finished.
+
+---
+
+## Cost Analysis
+
+Based on devnet measurements (SOL prices may vary):
+
+| Action | Fee (lamports) | Compute Units | Notes |
+|--------|---------------:|--------------:|-------|
+| close_game | 5,000 | 3,858 | Recovers ~1,428,760 lamports rent |
+| initialize | 5,000 | 10,018 | Deposits ~1,438,760 lamports rent (78 bytes) |
+| reveal | 5,000 | 5,435 | Verifies blake3 hash |
+| guess | 5,000 | ~2,770 | Simple comparison, cheapest instruction |
+| guess (correct) | 5,000 | ~3,085 | Sets is_finished flag |
+
+**Example full session (close + init + reveal + 5 guesses):**
+
+| Metric | Value |
+|--------|-------|
+| Total fees | 40,000 lamports (0.00004 SOL) |
+| Net rent cost | ~0 (close recovers, init re-deposits) |
+| Total compute units | ~32,470 |
+| USD cost (at $150/SOL) | ~$0.006 |
+
+**Key insight:** Every transaction has a flat 5,000 lamport base fee. The expensive part is the rent deposit for account creation, but that's fully recoverable when you close the account. The actual "cost to play" is just transaction fees — roughly half a cent.
+
 ---
 
 ## What's Next (Phase 2)
@@ -361,3 +438,4 @@ Phase 1 proves the on-chain game architecture works: accounts, instructions, eve
 - Full trustless randomness: the oracle's math proof guarantees the number was not manipulated.
 
 This mirrors the progression described in the [On-Chain Randomness Lesson](on-chain-randomness-lesson.md): from broken `rand` -> commit-reveal -> VRF oracle.
+

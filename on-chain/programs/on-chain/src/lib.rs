@@ -26,4 +26,8 @@ pub mod on_chain {
     pub fn guess(ctx: Context<Guess>, guess: u8) -> Result<()> {
         guess::guess_handler(ctx, guess)
     }
+
+    pub fn close_game(ctx: Context<CloseGame>) -> Result<()> {
+        close_game::close_game_handler(ctx)
+    }
 }

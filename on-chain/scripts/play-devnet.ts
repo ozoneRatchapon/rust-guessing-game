@@ -83,12 +83,12 @@ const link = (url: string) => `${C.underline}${C.blue}${url}${C.reset}`;
 
 interface GameAccount {
   admin: PublicKey;
-  secret_hash: number[];
-  secret_number: number;
-  is_revealed: boolean;
+  secretHash: Uint8Array | number[];
+  secretNumber: number;
+  isRevealed: boolean;
   attempts: number;
-  max_tries: number;
-  is_finished: boolean;
+  maxTries: number;
+  isFinished: boolean;
   bump: number;
 }
 
@@ -114,16 +114,17 @@ function explorerUrl(signature: string): string {
 }
 
 function formatGame(state: GameAccount): string {
+  const hashArr = Array.from(state.secretHash);
   return [
     `    admin:         ${state.admin.toBase58()}`,
-    `    secret_hash:   [${state.secret_hash
-      .slice(0, 4)
-      .join(", ")}...${state.secret_hash.slice(-2).join(", ")}]`,
-    `    secret_number: ${state.is_revealed ? state.secret_number : "???"}`,
-    `    is_revealed:   ${state.is_revealed}`,
+    `    secret_hash:   [${hashArr.slice(0, 4).join(", ")}...${hashArr
+      .slice(-2)
+      .join(", ")}]`,
+    `    secret_number: ${state.isRevealed ? state.secretNumber : "???"}`,
+    `    is_revealed:   ${state.isRevealed}`,
     `    attempts:      ${state.attempts}`,
-    `    max_tries:     ${state.max_tries}`,
-    `    is_finished:   ${state.is_finished}`,
+    `    max_tries:     ${state.maxTries}`,
+    `    is_finished:   ${state.isFinished}`,
     `    bump:          ${state.bump}`,
   ].join("\n");
 }
@@ -262,21 +263,15 @@ async function main() {
     console.log(warn("[INITIALIZE]  Game account already exists at this PDA."));
     console.log(dim(formatGame(existingGame)));
 
-    if (existingGame.is_finished) {
-      console.log(
-        warn(
-          "  Previous game is finished. Close it first or use a different keypair."
-        )
-      );
-      rl.close();
-      return;
-    }
-
     const reinit = await askYesNo(rl, "  Re-initialize (overwrite)? [y/N]: ");
     if (!reinit) {
       console.log(dim("  Skipping initialize. Using existing game."));
       secretNumber = 0; // Will be set in reveal step
     } else {
+      // Close existing game account first
+      console.log(dim("  Closing existing game account..."));
+      await doCloseGame(program, keypair, gamePda, adminPk);
+
       secretNumber = await askNumber(
         rl,
         "  Enter secret number (1-100): ",
@@ -315,7 +310,7 @@ async function main() {
     gamePda
   )) as unknown as GameAccount;
 
-  if (!gameState.is_revealed) {
+  if (!gameState.isRevealed) {
     // If we skipped initialize, we need to ask for the secret
     if (secretNumber === 0) {
       secretNumber = await askNumber(
@@ -339,7 +334,7 @@ async function main() {
   //  STEP 3: GUESS LOOP
   // ──────────────────────────────────────────────────────────────────────────
 
-  if (gameState.is_finished) {
+  if (gameState.isFinished) {
     console.log(warn("Game is already finished!"));
     console.log(formatGame(gameState));
     rl.close();
@@ -352,7 +347,7 @@ async function main() {
     `  Guess the number between ${C.bold}1${C.reset} and ${C.bold}100${C.reset}.`
   );
   console.log(
-    `  You have ${C.bold}${gameState.max_tries}${C.reset} attempts. Good luck!`
+    `  You have ${C.bold}${gameState.maxTries}${C.reset} attempts. Good luck!`
   );
   console.log();
 
@@ -360,9 +355,9 @@ async function main() {
   gameState = (await program.account.game.fetch(
     gamePda
   )) as unknown as GameAccount;
-  const maxTries = gameState.max_tries;
+  const maxTries = gameState.maxTries;
 
-  while (!gameState.is_finished) {
+  while (!gameState.isFinished) {
     const attemptNum = gameState.attempts + 1;
 
     const guessNum = await askNumber(
@@ -401,12 +396,12 @@ async function main() {
     )) as unknown as GameAccount;
 
     // Determine result from state
-    if (gameState.is_finished && guessNum === secretNumber) {
+    if (gameState.isFinished && guessNum === secretNumber) {
       console.log();
       console.log(
         `${C.bgGreen}${C.bold}${C.white}  CORRECT!  ${C.reset} You guessed ${C.bold}${guessNum}${C.reset} in ${C.bold}${gameState.attempts}${C.reset} attempts!`
       );
-    } else if (gameState.is_finished && gameState.attempts >= maxTries) {
+    } else if (gameState.isFinished && gameState.attempts >= maxTries) {
       console.log();
       console.log(
         `${C.bgRed}${C.bold}${C.white}  GAME OVER!  ${C.reset} No more attempts. The secret was ${C.bold}${secretNumber}${C.reset}.`
@@ -513,6 +508,33 @@ async function doReveal(
     console.log(dim(formatGame(state)));
   } catch (e: any) {
     console.log(err(`  [REVEAL]  Failed: ${e.message}`));
+    if (e.logs) {
+      console.log(dim(e.logs.join("\n")));
+    }
+    process.exit(1);
+  }
+}
+
+async function doCloseGame(
+  program: OnChainProgram,
+  keypair: Keypair,
+  gamePda: PublicKey,
+  adminPk: PublicKey
+) {
+  try {
+    const sig = await program.methods
+      .closeGame()
+      .accounts({
+        game: gamePda,
+        admin: adminPk,
+      })
+      .signers([keypair])
+      .rpc();
+
+    console.log(ok(`  [CLOSE]  Game account closed, rent recovered.`));
+    console.log(`  ${C.bold}Explorer:${C.reset} ${link(explorerUrl(sig))}`);
+  } catch (e: any) {
+    console.log(err(`  [CLOSE]  Failed: ${e.message}`));
     if (e.logs) {
       console.log(dim(e.logs.join("\n")));
     }
