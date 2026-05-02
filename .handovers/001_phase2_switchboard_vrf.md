@@ -128,19 +128,27 @@ const settleIx = program.methods.settleRandom().accounts({...}).instruction();
 
 ### Open Questions
 
-- Should Phase 2 be a separate program or replace Phase 1?
-  - Recommendation: **replace** Phase 1, keep same program ID, git history preserves Phase 1
+- **DECIDED: Phase 2 is a separate program (`phase2-vrf`).** Phase 1 (`on-chain`) stays deployed at its own Program ID. Both coexist on devnet. Reasons: (1) Phase 1 stays demo-able forever, (2) different instructions need different IDLs, (3) side-by-side comparison is better for teaching.
 - Can LiteSVM tests work with Switchboard? 
   - Likely need to mock the randomness account data since Switchboard oracle won't run in LiteSVM
   - Alternative: test with `solana-test-validator` instead
 
 ### Remain Work
 
-- [ ] Implement program changes
-- [ ] Write tests
-- [ ] Update devnet script
-- [ ] Deploy
-- [ ] Update docs
+- [ ] Create `on-chain/programs/phase2-vrf/` as new Anchor program
+- [ ] Add `switchboard-on-demand` dependency with `anchor` feature
+- [ ] Implement `GameV2` account struct (add randomness_account, commit_slot)
+- [ ] Implement `initialize` (no secret param, commit randomness)
+- [ ] Implement `settle_random` (reveal VRF, derive secret)
+- [ ] Implement `guess` (same logic as Phase 1)
+- [ ] Implement `close_game` (same logic as Phase 1)
+- [ ] Write LiteSVM tests with mocked randomness
+- [ ] Create `scripts/play-phase2-devnet.ts` with Switchboard SDK
+- [ ] Create `scripts/demo.sh` launcher for all 4 demos
+- [ ] Create `on-chain/programs/broken-rand/` for broken rand demo
+- [ ] Create `scripts/build-broken-rand.ts`
+- [ ] Deploy Phase 2 to devnet (new Program ID)
+- [ ] Update all docs
 
 ### Issues Ref
 
@@ -149,15 +157,15 @@ const settleIx = program.methods.settleRandom().accounts({...}).instruction();
 ### How to Dev/Test
 
 ```bash
-# Build
+# Build Phase 2
 cd on-chain && anchor build --skip-lint
 
-# Test (need to figure out LiteSVM mocking)
-cargo test --manifest-path on-chain/programs/on-chain/Cargo.toml
+# Test Phase 2 (LiteSVM with mocked randomness)
+cargo test --manifest-path on-chain/programs/phase2-vrf/Cargo.toml
 
-# Deploy
-solana program deploy --url devnet target/deploy/on_chain.so --program-id target/deploy/on_chain-keypair.json
+# Deploy Phase 2 (separate Program ID from Phase 1)
+solana program deploy --url devnet target/deploy/phase2_vrf.so
 
-# Play
-yarn play:devnet
+# Play Phase 2
+npx tsx scripts/play-phase2-devnet.ts
 ```
