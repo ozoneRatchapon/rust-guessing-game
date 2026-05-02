@@ -78,16 +78,18 @@ Instead, we use a **VRF oracle** (like Switchboard) that generates randomness of
 ### How to Build and Test
 
 ```bash
+# Run all tests (Phase 1 + Phase 2 + broken-rand proof)
+bash test.sh
+
+# Or run individually:
+bash test.sh phase1       # 8 LiteSVM tests
+bash test.sh phase2       # 16 LiteSVM tests
+bash test.sh broken-rand  # Proves rand fails on BPF
+
 # Build the on-chain program (BPF)
 cargo build-sbf --manifest-path on-chain/programs/on-chain/Cargo.toml
 
-# Run Phase 1 tests (8 tests using LiteSVM)
-cargo test --manifest-path on-chain/programs/on-chain/Cargo.toml
-
-# Run Phase 2 tests (16 tests using LiteSVM with mocked Switchboard)
-cargo test --manifest-path on-chain/programs/phase2-vrf/Cargo.toml
-
-# Generate IDL (needed for devnet play script)
+# Generate IDL (needed for devnet play scripts)
 cd on-chain && anchor build --skip-lint
 ```
 
