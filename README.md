@@ -45,18 +45,98 @@ On Solana, hundreds of computers (validators) must all get the **same answer** f
 
 Instead, we use a **VRF oracle** (like Switchboard) that generates randomness off-chain and provides a cryptographic proof that can be verified on-chain. This is covered in detail in our [teaching guide](docs/on-chain-randomness-lesson.md).
 
-### How It Works
+### How It Works (Phase 1: Commit-Reveal)
 
-1. **Admin** starts a game -- the program requests a random secret number (1-100) from a VRF oracle
-2. **Player** submits guesses -- the program responds with "too small", "too big", or "you win!"
-3. Game tracks attempts and enforces a max-try limit
+1. **Admin** starts a game -- commits a `blake3` hash of a secret number (1-100) on-chain
+2. **Admin** reveals the secret -- program verifies the hash matches, then stores the number
+3. **Player** submits guesses -- the program responds with "too small", "too big", or "you win!"
+4. Game tracks attempts and enforces a 10-try limit
+
+> In Phase 2, step 1-2 will be replaced by a VRF oracle for trustless randomness.
 
 ### Build Phases
 
 | Phase | What | Status |
 |-------|------|--------|
-| **Phase 1** | Core game with Anchor (commit-reveal for the secret, no VRF yet) | Up Next |
+| **Phase 1** | Core game with Anchor (commit-reveal for the secret, no VRF yet) | Done |
 | **Phase 2** | Upgrade to Switchboard VRF for real on-chain randomness | Planned |
+
+### How to Build and Test
+
+```bash
+# Build the on-chain program (BPF)
+cargo build-sbf --manifest-path on-chain/programs/on-chain/Cargo.toml
+
+# Run all tests (8 tests using LiteSVM)
+cargo test --manifest-path on-chain/programs/on-chain/Cargo.toml
+
+# Generate IDL (needed for devnet play script)
+cd on-chain && anchor build --skip-lint
+```
+
+### How to Play
+
+Each phase has its own playable experience:
+
+| Mode | Command | Network | Explorer |
+|------|---------|---------|----------|
+| Local (LiteSVM) | `cargo run --manifest-path on-chain/programs/on-chain/Cargo.toml --features play --bin play` | In-memory VM | No |
+| Devnet (Explorer) | `cd on-chain && yarn play:devnet` | Devnet | Yes |
+
+**Local mode** uses LiteSVM -- instant, no network needed. Runs the actual compiled BPF program.
+
+**Devnet mode** sends real transactions to Solana devnet. Each tx gets an Explorer link:
+```
+https://explorer.solana.com/tx/<SIGNATURE>?cluster=devnet
+```
+
+### On-Chain Project Structure
+
+```
+on-chain/
+  programs/on-chain/src/
+    lib.rs                          # Program entry (initialize, reveal, guess)
+    state.rs                        # Game account + event structs
+    error.rs                        # GameError enum (7 error codes)
+    constants.rs                    # MAX_TRIES=10, range 1-100
+    instructions/
+      initialize.rs                 # Admin creates game, commits blake3 hash
+      reveal.rs                     # Admin reveals secret, program verifies hash
+      guess.rs                      # Player guesses, program responds
+  programs/on-chain/tests/
+    test_initialize.rs              # 8 tests (init, reveal, guess, security)
+```
+
+### Instructions
+
+| Instruction | Who | What |
+|-------------|-----|------|
+| `initialize(secret_number)` | Admin | Creates game PDA, stores `blake3(secret)` as commitment |
+| `reveal(secret_number)` | Admin | Reveals the secret, program verifies hash matches commitment |
+| `guess(guess)` | Anyone | Submits a guess (1-100), gets too-small/too-big/correct response |
+
+### Deploy to Devnet
+
+The program is deployed on devnet:
+```
+Program ID: 3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT
+Explorer:   https://explorer.solana.com/address/3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT?cluster=devnet
+```
+
+To redeploy:
+```bash
+solana program deploy on-chain/target/deploy/on_chain.so --url devnet
+solana program show --url devnet 3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT
+```
+
+### Security Model (Phase 1)
+
+- **Commit-reveal**: Admin commits a hash at `initialize`, reveals at `reveal`. Program verifies `blake3(secret) == stored_hash`.
+- **No secret stored until reveal**: The `secret_number` field is `0` until the admin reveals.
+- **Max 10 attempts**: Game auto-finishes when attempts exhausted.
+- **Admin-only reveal**: Only the game admin can reveal the secret.
+
+> Note: Phase 1 uses a trust-on-admin model. Phase 2 replaces this with Switchboard VRF for trustless randomness.
 
 ### What It Teaches
 
@@ -78,6 +158,7 @@ Instead, we use a **VRF oracle** (like Switchboard) that generates randomness of
 
 ## References
 
+- [Phase 1: Commit-Reveal Walkthrough](docs/phase1-commit-reveal.md)
 - [On-Chain Randomness & Security Teaching Guide](docs/on-chain-randomness-lesson.md)
 - [The Rust Programming Language - Ch.2](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html)
 - [Anchor Documentation](https://www.anchor-lang.com/)

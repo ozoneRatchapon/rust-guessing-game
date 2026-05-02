@@ -342,6 +342,16 @@ fn process_randomness(ctx: Context<ReceiveRandomness>, result: u64) -> Result<()
 }
 ```
 
+### Real Implementation (Phase 1)
+
+The code above was theoretical. We've now implemented Phase 1 using the commit-reveal scheme:
+
+- **Program source**: `on-chain/programs/on-chain/src/`
+- **Tests**: 8 LiteSVM tests, all passing
+- **Playable**: Both local (LiteSVM) and devnet (Explorer)
+
+See [Phase 1 Walkthrough](phase1-commit-reveal.md) for the full architecture and code reference.
+
 ---
 
 ## 6. Cheat Sheet
