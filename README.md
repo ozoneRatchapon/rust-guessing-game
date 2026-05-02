@@ -48,7 +48,7 @@ The CLI version uses the `rand` crate to pick a random number. That works fine o
 
 ---
 
-## On-Chain Version (In Progress)
+## On-Chain Version
 
 The same guessing game, rebuilt as a Solana program using [Anchor](https://www.anchor-lang.com/) with proper on-chain randomness.
 
@@ -72,8 +72,8 @@ Instead, we use a **VRF oracle** (like Switchboard) that generates randomness of
 | Phase | What | Status |
 |-------|------|--------|
 | **Phase 1** | Commit-reveal with Anchor | Done |
-| **Phase 2** | Switchboard VRF (separate program) | In Progress |
-| **Bonus** | Broken `rand` demo | Planned |
+| **Phase 2** | Switchboard VRF (separate program) | Done |
+| **Bonus** | Broken `rand` demo | Done |
 
 ### How to Build and Test
 
@@ -142,18 +142,18 @@ on-chain/
 | `guess(guess)` | Anyone | Submits a guess (1-100), gets too-small/too-big/correct response |
 | `close_game()` | Admin | Closes game account, recovers rent lamports to admin |
 
-### Deploy to Devnet
+### Deployed on Devnet
 
-The program is deployed on devnet:
-```
-Program ID: 3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT
-Explorer:   https://explorer.solana.com/address/3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT?cluster=devnet
-```
+| Program | ID | Explorer |
+|---------|----|----------|
+| Phase 1 (commit-reveal) | `3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT` | [View](https://explorer.solana.com/address/3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT?cluster=devnet) |
+| Phase 2 (Switchboard VRF) | `CHXkyr3GrLvWRXdbnYgPMKhwU1dYF6gW9aUpV8S3oTJw` | [View](https://explorer.solana.com/address/CHXkyr3GrLvWRXdbnYgPMKhwU1dYF6gW9aUpV8S3oTJw?cluster=devnet) |
 
 To redeploy:
 ```bash
 solana program deploy on-chain/target/deploy/on_chain.so --url devnet
-solana program show --url devnet 3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT
+solana program deploy on-chain/target/deploy/phase2_vrf.so --url devnet \
+  --program-id on-chain/target/deploy/phase2_vrf-keypair.json
 ```
 
 ### Security Model (Phase 1)

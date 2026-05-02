@@ -1,6 +1,6 @@
 # 001: Broken `rand` Demo — Proof That Randomness Fails On-Chain
 
-## Status: Planned (after Phase 2)
+## Status: Complete
 
 ## What
 
@@ -12,7 +12,7 @@ The teaching guide (`docs/on-chain-randomness-lesson.md`) explains *why* `rand` 
 
 ## Plan
 
-- Create `on-chain/programs/broken-rand/` as a separate Anchor program
+Create `on-chain/demos/broken-rand/` as a standalone workspace (not in Anchor workspace)
 - Add `rand` as a dependency
 - Use `rand::thread_rng().gen_range(1..=100)` in a single instruction
 - Run `cargo build-sbf` → watch it fail
@@ -21,20 +21,28 @@ The teaching guide (`docs/on-chain-randomness-lesson.md`) explains *why* `rand` 
 
 ## Acceptance Criteria
 
-- [ ] `broken-rand` program compiles for host target but fails for BPF
-- [ ] Error message is captured and documented
-- [ ] Doc links back to the teaching guide's explanation
+- [x] `broken-rand` program compiles for host target but fails for BPF
+- [x] Error message is captured and documented
+- [x] Doc links back to the teaching guide's explanation
 
 ### Demo Script
 
 A TypeScript runner `scripts/build-broken-rand.ts` that:
-1. Runs `cargo build-sbf --manifest-path on-chain/programs/broken-rand/Cargo.toml`
+Runs `cargo build-sbf --manifest-path on-chain/demos/broken-rand/Cargo.toml`
 2. Captures stderr
 3. Displays the error with highlighted key lines
 4. Prints a summary: "This is why `rand` cannot be used on Solana"
 5. Links to `docs/on-chain-randomness-lesson.md` for the full explanation
 
 Can also be run via `./scripts/demo.sh 4`.
+
+## Result
+
+- Program lives in `on-chain/demos/broken-rand/` (standalone workspace, not in Anchor workspace)
+- Host compilation: PASSES (`cargo check`)
+- BPF compilation: FAILS with `getrandom` error: "target is not supported"
+- Demo script `scripts/build-broken-rand.ts` shows both steps with color output
+- Available via `bash scripts/demo.sh 4`
 
 ## Refs
 

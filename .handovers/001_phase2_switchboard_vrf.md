@@ -1,6 +1,27 @@
 # 001: Phase 2 — Switchboard VRF Upgrade
 
-## Status: Planning
+## Status: Complete
+
+## Result
+
+Phase 2 (`phase2-vrf`) is built, deployed, and tested on devnet.
+
+- Program ID: `CHXkyr3GrLvWRXdbnYgPMKhwU1dYF6gW9aUpV8S3oTJw`
+- Instructions: initialize, settle_random, guess, close_game
+- Switchboard VRF integration working with on-demand oracle
+- Devnet script: `scripts/play-phase2-devnet.ts`
+- Full flow verified: init → wait 3s → settle → guess → correct
+- Architecture: separate program from Phase 1 (not a replacement)
+
+### API Adjustments Made
+
+| Issue | Original Plan | Actual |
+|-------|--------------|--------|
+| `anchor` feature | `features = ["anchor"]` | Removed — causes borsh v1 conflict |
+| `get_value()` | takes `&Clock` | takes `u64` slot |
+| `get_value()` return | `Option<[u8; 32]>` | `Result<[u8; 32], OnDemandError>` |
+| `AccountInfo` | `AccountInfo<'info>` | `UncheckedAccount<'info>` |
+| `getrandom` | Not planned | Needed `features = ["custom"]` for SBF target |
 
 ## What Happened
 
@@ -135,20 +156,20 @@ const settleIx = program.methods.settleRandom().accounts({...}).instruction();
 
 ### Remain Work
 
-- [ ] Create `on-chain/programs/phase2-vrf/` as new Anchor program
-- [ ] Add `switchboard-on-demand` dependency with `anchor` feature
-- [ ] Implement `GameV2` account struct (add randomness_account, commit_slot)
-- [ ] Implement `initialize` (no secret param, commit randomness)
-- [ ] Implement `settle_random` (reveal VRF, derive secret)
-- [ ] Implement `guess` (same logic as Phase 1)
-- [ ] Implement `close_game` (same logic as Phase 1)
+- [x] Create `on-chain/programs/phase2-vrf/` as new Anchor program
+- [x] Add `switchboard-on-demand` dependency
+- [x] Implement `GameV2` account struct
+- [x] Implement `initialize` (commit randomness)
+- [x] Implement `settle_random` (reveal VRF, derive secret)
+- [x] Implement `guess` (same logic as Phase 1)
+- [x] Implement `close_game` (same logic as Phase 1)
 - [ ] Write LiteSVM tests with mocked randomness
-- [ ] Create `scripts/play-phase2-devnet.ts` with Switchboard SDK
-- [ ] Create `scripts/demo.sh` launcher for all 4 demos
-- [ ] Create `on-chain/programs/broken-rand/` for broken rand demo
-- [ ] Create `scripts/build-broken-rand.ts`
-- [ ] Deploy Phase 2 to devnet (new Program ID)
-- [ ] Update all docs
+- [x] Create `scripts/play-phase2-devnet.ts` with Switchboard SDK
+- [x] Create `scripts/demo.sh` launcher for all 4 demos
+- [x] Create `on-chain/demos/broken-rand/` for broken rand demo
+- [x] Create `scripts/build-broken-rand.ts`
+- [x] Deploy Phase 2 to devnet (new Program ID)
+- [x] Update all docs
 
 ### Issues Ref
 
