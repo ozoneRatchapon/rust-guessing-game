@@ -153,8 +153,8 @@ on-chain/
 
 | Program | ID | Explorer |
 |---------|----|----------|
-| Phase 1 (commit-reveal) | `3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT` | [View](https://explorer.solana.com/address/3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT?cluster=devnet) |
-| Phase 2 (Switchboard VRF) | `CHXkyr3GrLvWRXdbnYgPMKhwU1dYF6gW9aUpV8S3oTJw` | [View](https://explorer.solana.com/address/CHXkyr3GrLvWRXdbnYgPMKhwU1dYF6gW9aUpV8S3oTJw?cluster=devnet) |
+| Phase 1 (commit-reveal) | `KXXhoaNpoXNNHCqB2YYjEBSXoUikpa2tou4haVJgvEU` | [View](https://explorer.solana.com/address/KXXhoaNpoXNNHCqB2YYjEBSXoUikpa2tou4haVJgvEU?cluster=devnet) |
+| Phase 2 (Switchboard VRF) | `94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2` | [View](https://explorer.solana.com/address/94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2?cluster=devnet) |
 
 To redeploy:
 ```bash
