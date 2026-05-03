@@ -85,7 +85,7 @@ const DEFAULT_QUEUE = new PublicKey(
   "Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh"
 );
 const SLOT_HASHES_SYSVAR = new PublicKey(
-  "SysvarS1otHashes11111111111111111111111111111111111111111"
+  "SysvarS1otHashes111111111111111111111111111"
 );
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
@@ -388,10 +388,12 @@ async function main() {
     `${C.bold}[REQUEST]${C.reset}  Requesting randomness from MagicBlock VRF...`
   );
 
-  // Derive the VRF program identity PDA (seeds: [b"identity"], program: VRF_PROGRAM_ID)
+  // Derive the identity PDA from OUR program (seeds: [b"identity"], program: our PROGRAM_ID)
+  // This matches the on-chain seeds constraint in RequestRandomness.
+  // The VRF program verifies the callback by deriving the same PDA from callback_program_id.
   const [programIdentity] = PublicKey.findProgramAddressSync(
     [Buffer.from("identity")],
-    VRF_PROGRAM_ID
+    PROGRAM_ID
   );
 
   try {

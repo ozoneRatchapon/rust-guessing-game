@@ -11,12 +11,12 @@ use crate::constants::*;
 /// (which is incompatible with Anchor 1.0.1's Pubkey type).
 #[derive(Accounts)]
 pub struct RequestRandomness<'info> {
-    /// CHECK: The VRF program identity PDA derived from seeds [b"identity"].
-    /// Used as a signing PDA for the CPI to the VRF program.
+    /// CHECK: The identity PDA derived from seeds [b"identity"] owned by OUR program.
+    /// This PDA signs the CPI to the VRF program, proving the callback is from us.
+    /// The VRF program derives the same PDA from callback_program_id (our ID).
     #[account(
         seeds = [IDENTITY_SEED],
         bump,
-        seeds::program = vrf_program,
     )]
     pub program_identity: UncheckedAccount<'info>,
     /// CHECK: The oracle queue (validated by address)
@@ -76,8 +76,8 @@ pub fn request_randomness_handler(ctx: Context<RequestRandomness>, client_seed: 
 
     let identity_bump = ctx.bumps.program_identity;
 
-    // Slot hashes sysvar ID: SysvarS1otHashes11111111111111111111111111111111111111111
-    let slot_hashes_id: Pubkey = "SysvarS1otHashes11111111111111111111111111111111111111111"
+    // Slot hashes sysvar ID: SysvarS1otHashes111111111111111111111111111
+    let slot_hashes_id: Pubkey = "SysvarS1otHashes111111111111111111111111111"
         .parse()
         .unwrap();
 
