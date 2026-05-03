@@ -38,6 +38,7 @@ show_menu() {
     echo -e "  ${BOLD}2${RESET}) Phase 1: Commit-Reveal   ${DIM}(devnet, admin secret)${RESET}"
     echo -e "  ${BOLD}3${RESET}) Phase 2: Switchboard VRF  ${DIM}(devnet, trustless VRF)${RESET}"
     echo -e "  ${BOLD}4${RESET}) Broken \`rand\` Proof       ${DIM}(cargo build-sbf fails)${RESET}"
+    echo -e "  ${BOLD}5${RESET}) Phase 3: MagicBlock VRF  ${DIM}(devnet, free fast VRF)${RESET}"
     echo
 }
 
@@ -84,6 +85,16 @@ run_demo() {
             cd "$ROOT_DIR"
             npx tsx scripts/build-broken-rand.ts
             ;;
+        5)
+            echo
+            banner "━━━ Demo 5: Phase 3 — MagicBlock VRF ━━━"
+            echo
+            echo -e "  ${DIM}Anchor program on devnet with MagicBlock VRF randomness${RESET}"
+            echo -e "  ${DIM}Program: DnrNKTTspzjip8CAFXzCNkbMbQKXjNbZGnx6gNGtCEAH${RESET}"
+            echo
+            cd "$ROOT_DIR"
+            npx tsx scripts/play-phase3-devnet.ts
+            ;;
         *)
             err "Invalid choice: $choice"
             show_menu
@@ -97,7 +108,7 @@ if [ $# -eq 1 ]; then
     run_demo "$1"
 else
     show_menu
-    echo -en "  ${BOLD}Pick a demo [1-4]:${RESET} "
+    echo -en "  ${BOLD}Pick a demo [1-5]:${RESET} "
     read -r choice
     run_demo "$choice"
 fi

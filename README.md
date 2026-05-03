@@ -12,6 +12,7 @@ A guessing game that started as a CLI toy and is evolving into an **on-chain Sol
 | 2 | Phase 1: Commit-Reveal | `cd on-chain && npx tsx scripts/play-devnet.ts` | Anchor program, admin commit-reveal on devnet |
 | 3 | Phase 2: Switchboard VRF | `cd on-chain && npx tsx scripts/play-phase2-devnet.ts` | Trustless VRF randomness on devnet |
 | 4 | Broken `rand` Proof | `cd on-chain && npx tsx scripts/build-broken-rand.ts` | `cargo build-sbf` fails = proof |
+| 5 | Phase 3: MagicBlock VRF | `cd on-chain && npx tsx scripts/play-phase3-devnet.ts` | MagicBlock VRF (free, fast) |
 
 Or use the launcher: `cd on-chain && bash scripts/demo.sh`
 
@@ -73,17 +74,19 @@ Instead, we use a **VRF oracle** (like Switchboard) that generates randomness of
 |-------|------|--------|
 | **Phase 1** | Commit-reveal with Anchor | Done |
 | **Phase 2** | Switchboard VRF (separate program) | Done |
+| **Phase 3** | MagicBlock VRF (separate program) | Done |
 | **Bonus** | Broken `rand` demo | Done |
 
 ### How to Build and Test
 
 ```bash
-# Run all tests (Phase 1 + Phase 2 + broken-rand proof)
+# Run all tests (Phase 1 + Phase 2 + Phase 3 + broken-rand proof)
 bash test.sh
 
 # Or run individually:
 bash test.sh phase1       # 8 LiteSVM tests
 bash test.sh phase2       # 16 LiteSVM tests
+bash test.sh phase3       # 15 LiteSVM tests
 bash test.sh broken-rand  # Proves rand fails on BPF
 
 # Build the on-chain program (BPF)
@@ -102,6 +105,7 @@ Each phase has its own playable experience:
 | Local (LiteSVM) | `cargo run --manifest-path on-chain/programs/on-chain/Cargo.toml --features play --bin play` | In-memory VM | No |
 | Devnet Phase 1 | `cd on-chain && npx tsx scripts/play-devnet.ts` | Devnet | Yes |
 | Devnet Phase 2 | `cd on-chain && npx tsx scripts/play-phase2-devnet.ts` | Devnet | Yes |
+| Devnet Phase 3 | `cd on-chain && npx tsx scripts/play-phase3-devnet.ts` | Devnet | Yes |
 
 **Local mode** uses LiteSVM -- instant, no network needed. Runs the actual compiled BPF program.
 
@@ -131,21 +135,37 @@ on-chain/
     phase2-vrf/            ← Phase 2 (Switchboard VRF)
       tests/
         test_phase2.rs                  # 16 tests (init, settle, guess, security, mock VRF)
+    phase3-magicblock-vrf/  ← Phase 3 (MagicBlock VRF)
+      tests/
+        test_phase3.rs                  # 15 tests (init, consume, guess, security)
   demos/
     broken-rand/           ← Standalone program: proves rand fails on-chain
   scripts/
     play-devnet.ts                    ← Phase 1 interactive script
     play-phase2-devnet.ts             ← Phase 2 interactive script
+    play-phase3-devnet.ts             ← Phase 3 interactive script
     build-broken-rand.ts              ← Build broken-rand, shows error
     demo.sh                           ← Menu launcher for all demos
 ```
 
 ### Instructions
 
+#### Phase 1 & 2: Commit-Reveal / Switchboard VRF
+
 | Instruction | Who | What |
 |-------------|-----|------|
 | `initialize(secret_number)` | Admin | Creates game PDA, stores `blake3(secret)` as commitment |
 | `reveal(secret_number)` | Admin | Reveals the secret, program verifies hash matches commitment |
+| `guess(guess)` | Anyone | Submits a guess (1-100), gets too-small/too-big/correct response |
+| `close_game()` | Admin | Closes game account, recovers rent lamports to admin |
+
+#### Phase 3: MagicBlock VRF
+
+| Instruction | Who | What |
+|-------------|-----|------|
+| `initialize()` | Admin | Creates game PDA |
+| `request_randomness(client_seed)` | Admin | CPI to MagicBlock VRF, submits randomness request |
+| `consume_randomness(randomness)` | VRF Program | Callback: derives secret 1-100 from VRF bytes |
 | `guess(guess)` | Anyone | Submits a guess (1-100), gets too-small/too-big/correct response |
 | `close_game()` | Admin | Closes game account, recovers rent lamports to admin |
 
@@ -155,12 +175,15 @@ on-chain/
 |---------|----|----------|
 | Phase 1 (commit-reveal) | `KXXhoaNpoXNNHCqB2YYjEBSXoUikpa2tou4haVJgvEU` | [View](https://explorer.solana.com/address/KXXhoaNpoXNNHCqB2YYjEBSXoUikpa2tou4haVJgvEU?cluster=devnet) |
 | Phase 2 (Switchboard VRF) | `94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2` | [View](https://explorer.solana.com/address/94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2?cluster=devnet) |
+| Phase 3 (MagicBlock VRF) | `DnrNKTTspzjip8CAFXzCNkbMbQKXjNbZGnx6gNGtCEAH` | [View](https://explorer.solana.com/address/DnrNKTTspzjip8CAFXzCNkbMbQKXjNbZGnx6gNGtCEAH?cluster=devnet) |
 
 To redeploy:
 ```bash
 solana program deploy on-chain/target/deploy/on_chain.so --url devnet
 solana program deploy on-chain/target/deploy/phase2_vrf.so --url devnet \
   --program-id on-chain/target/deploy/phase2_vrf-keypair.json
+solana program deploy on-chain/target/deploy/phase3_magicblock_vrf.so --url devnet \
+  --program-id on-chain/target/deploy/phase3_magicblock_vrf-keypair.json
 ```
 
 ### Security Model (Phase 1)
@@ -179,6 +202,8 @@ Phase 2 lives in its own Anchor program (`phase2-vrf`), not as an upgrade to Pha
 - **Phase 1 stays demo-able forever** -- already deployed on devnet, students can interact with it at any time
 - **Different instructions** -- Phase 2 drops `reveal` (admin reveals secret) and adds `settle_random` (VRF callback). The instruction set is fundamentally different
 - **Side-by-side teaching** -- students see both approaches (commit-reveal vs. VRF) and understand the trade-offs
+
+> Phase 3 is also a **separate program** (`phase3-magicblock-vrf`) that uses MagicBlock VRF for free, fast verifiable randomness. It has a callback-based architecture: `request_randomness` CPIs to the VRF program, which calls back into `consume_randomness` with the random bytes.
 
 ### Cost to Play
 
@@ -206,6 +231,16 @@ Rent for the game account (78 bytes) is ~0.0014 SOL, fully recoverable via `clos
 
 Phase 2 `initialize` is a multi-instruction transaction: it creates a Switchboard randomness account and then calls our `initialize` instruction in the same transaction, hence the double fee (10,000 lamports). A full Phase 2 session (init + settle + 5 guesses + close) costs ~0.00006 SOL in fees.
 
+#### Phase 3: MagicBlock VRF
+
+| Action | Fee | Notes |
+|--------|----:|-------|
+| initialize | 5,000 lamports | Creates game PDA |
+| request_randomness | 5,000 lamports | CPI to MagicBlock VRF (VRF itself is free) |
+| consume_randomness | 5,000 lamports | VRF callback — no manual action needed |
+| guess | 5,000 lamports | Per guess |
+| close_game | 5,000 lamports | Rent recovery |
+
 ### What It Teaches
 
 - Solana account model and program architecture
@@ -222,11 +257,13 @@ Phase 2 `initialize` is a multi-instruction transaction: it creates a Switchboar
 - **Rust** -- The programming language
 - **Anchor** -- Solana program framework
 - **Switchboard VRF** -- On-chain randomness oracle (Phase 2)
+- **MagicBlock VRF** -- Free, fast verifiable randomness (Phase 3)
 - **rand** crate -- For the CLI version only
 
 ## References
 
 - [Phase 1: Commit-Reveal Walkthrough](docs/phase1-commit-reveal.md)
+- [Phase 3: MagicBlock VRF Walkthrough](docs/phase3-magicblock-vrf.md)
 - [On-Chain Randomness & Security Teaching Guide](docs/on-chain-randomness-lesson.md)
 - [The Rust Programming Language - Ch.2](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html)
 - [Anchor Documentation](https://www.anchor-lang.com/)
