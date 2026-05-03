@@ -13,6 +13,7 @@ A guessing game that started as a CLI toy and is evolving into an **on-chain Sol
 | 3 | Phase 2: Switchboard VRF | `cd on-chain && npx tsx scripts/play-phase2-devnet.ts` | Trustless VRF randomness on devnet |
 | 4 | Broken `rand` Proof | `cd on-chain && npx tsx scripts/build-broken-rand.ts` | `cargo build-sbf` fails = proof |
 | 5 | Phase 3: MagicBlock VRF | `cd on-chain && npx tsx scripts/play-phase3-devnet.ts` | MagicBlock VRF (free, fast) |
+| 6 | Phase 4: Multi-Player Tournament | `cd on-chain && npx tsx scripts/play-phase4-devnet.ts` | Up to 16 players, Switchboard VRF |
 
 Or use the launcher: `cd on-chain && bash scripts/demo.sh`
 
@@ -75,6 +76,7 @@ Instead, we use a **VRF oracle** (like Switchboard) that generates randomness of
 | **Phase 1** | Commit-reveal with Anchor | Done |
 | **Phase 2** | Switchboard VRF (separate program) | Done |
 | **Phase 3** | MagicBlock VRF (separate program) | Done |
+| **Phase 4** | Multi-Player Tournament (up to 16 players) | Done |
 | **Bonus** | Broken `rand` demo | Done |
 
 ### How to Build and Test
@@ -87,6 +89,7 @@ bash test.sh
 bash test.sh phase1       # 8 LiteSVM tests
 bash test.sh phase2       # 16 LiteSVM tests
 bash test.sh phase3       # 15 LiteSVM tests
+bash test.sh phase4       # 24 LiteSVM tests
 bash test.sh broken-rand  # Proves rand fails on BPF
 
 # Build the on-chain program (BPF)
@@ -106,6 +109,7 @@ Each phase has its own playable experience:
 | Devnet Phase 1 | `cd on-chain && npx tsx scripts/play-devnet.ts` | Devnet | Yes |
 | Devnet Phase 2 | `cd on-chain && npx tsx scripts/play-phase2-devnet.ts` | Devnet | Yes |
 | Devnet Phase 3 | `cd on-chain && npx tsx scripts/play-phase3-devnet.ts` | Devnet | Yes |
+| Devnet Phase 4 | `cd on-chain && npx tsx scripts/play-phase4-devnet.ts` | Devnet | Yes |
 
 **Local mode** uses LiteSVM -- instant, no network needed. Runs the actual compiled BPF program.
 
@@ -138,12 +142,16 @@ on-chain/
     phase3-magicblock-vrf/  ← Phase 3 (MagicBlock VRF)
       tests/
         test_phase3.rs                  # 15 tests (init, consume, guess, security)
+    phase4-tournament/      ← Phase 4 (Multi-Player Tournament)
+      tests/
+        test_phase4.rs                  # 24 tests (create, settle, join, guess, close, errors)
   demos/
     broken-rand/           ← Standalone program: proves rand fails on-chain
   scripts/
     play-devnet.ts                    ← Phase 1 interactive script
     play-phase2-devnet.ts             ← Phase 2 interactive script
     play-phase3-devnet.ts             ← Phase 3 interactive script
+    play-phase4-devnet.ts             ← Phase 4 interactive script (multi-player)
     build-broken-rand.ts              ← Build broken-rand, shows error
     demo.sh                           ← Menu launcher for all demos
 ```
@@ -169,6 +177,18 @@ on-chain/
 | `guess(guess)` | Anyone | Submits a guess (1-100), gets too-small/too-big/correct response |
 | `close_game()` | Admin | Closes game account, recovers rent lamports to admin |
 
+#### Phase 4: Multi-Player Tournament
+
+| Instruction | Who | What |
+|-------------|-----|------|
+| `create_tournament()` | Admin | Creates tournament PDA with Switchboard VRF commitment |
+| `settle_tournament()` | Admin | Reveals VRF randomness, sets secret number (1-100) |
+| `join_tournament()` | Anyone | Player joins tournament (up to 16 players) |
+| `submit_guess(guess)` | Joined player | Submits a guess, gets too-high/too-low/correct feedback |
+| `close_tournament()` | Admin | Closes tournament, recovers rent |
+
+Players are ranked by: exact matches first, then closest distance to the secret. Each player gets 10 guesses.
+
 ### Deployed on Devnet
 
 | Program | ID | Explorer |
@@ -176,6 +196,7 @@ on-chain/
 | Phase 1 (commit-reveal) | `KXXhoaNpoXNNHCqB2YYjEBSXoUikpa2tou4haVJgvEU` | [View](https://explorer.solana.com/address/KXXhoaNpoXNNHCqB2YYjEBSXoUikpa2tou4haVJgvEU?cluster=devnet) |
 | Phase 2 (Switchboard VRF) | `94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2` | [View](https://explorer.solana.com/address/94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2?cluster=devnet) |
 | Phase 3 (MagicBlock VRF) | `DnrNKTTspzjip8CAFXzCNkbMbQKXjNbZGnx6gNGtCEAH` | [View](https://explorer.solana.com/address/DnrNKTTspzjip8CAFXzCNkbMbQKXjNbZGnx6gNGtCEAH?cluster=devnet) |
+| Phase 4 (Multi-Player Tournament) | `FKqXgQYFUgMifKoQTYbb5UzMLry6RDo9E6dWm6E4fKoL` | [View](https://explorer.solana.com/address/FKqXgQYFUgMifKoQTYbb5UzMLry6RDo9E6dWm6E4fKoL?cluster=devnet) |
 
 To redeploy:
 ```bash
@@ -184,6 +205,8 @@ solana program deploy on-chain/target/deploy/phase2_vrf.so --url devnet \
   --program-id on-chain/target/deploy/phase2_vrf-keypair.json
 solana program deploy on-chain/target/deploy/phase3_magicblock_vrf.so --url devnet \
   --program-id on-chain/target/deploy/phase3_magicblock_vrf-keypair.json
+solana program deploy on-chain/target/deploy/phase4_tournament.so --url devnet \
+  --program-id on-chain/target/deploy/phase4_tournament-keypair.json
 ```
 
 ### Security Model (Phase 1)
@@ -194,6 +217,8 @@ solana program deploy on-chain/target/deploy/phase3_magicblock_vrf.so --url devn
 - **Admin-only reveal**: Only the game admin can reveal the secret.
 
 > Note: Phase 1 uses a trust-on-admin model. Phase 2 is a **separate program** (`phase2-vrf`) that uses Switchboard VRF for trustless randomness. Both programs coexist on devnet.
+>
+> Phase 4 extends Phase 2's VRF approach into a **multi-player tournament** (`phase4-tournament`) — up to 16 players compete with 10 guesses each, ranked by exact matches and closest distance.
 
 ### Architecture Decision: Why Phase 2 Is Separate
 
@@ -204,6 +229,8 @@ Phase 2 lives in its own Anchor program (`phase2-vrf`), not as an upgrade to Pha
 - **Side-by-side teaching** -- students see both approaches (commit-reveal vs. VRF) and understand the trade-offs
 
 > Phase 3 is also a **separate program** (`phase3-magicblock-vrf`) that uses MagicBlock VRF for free, fast verifiable randomness. It has a callback-based architecture: `request_randomness` CPIs to the VRF program, which calls back into `consume_randomness` with the random bytes.
+>
+> Phase 4 is a **separate program** (`phase4-tournament`) that adds multi-player competition. It reuses Switchboard VRF but introduces a tournament lifecycle: players join independently, submit guesses with feedback, and are ranked at the end.
 
 ### Cost to Play
 
@@ -231,6 +258,18 @@ Rent for the game account (78 bytes) is ~0.0014 SOL, fully recoverable via `clos
 
 Phase 2 `initialize` is a multi-instruction transaction: it creates a Switchboard randomness account and then calls our `initialize` instruction in the same transaction, hence the double fee (10,000 lamports). A full Phase 2 session (init + settle + 5 guesses + close) costs ~0.00006 SOL in fees.
 
+#### Phase 4: Multi-Player Tournament
+
+| Action | Fee | Notes |
+|--------|----:|-------|
+| create_tournament | 10,000 lamports | Includes Switchboard VRF commitment |
+| settle_tournament | 5,000 lamports | Reveals VRF randomness, sets secret |
+| join_tournament | 5,000 lamports | Per player |
+| submit_guess | 5,000 lamports | Per guess, per player |
+| close_tournament | 5,000 lamports | Rent recovery |
+
+A full tournament (create + settle + 4 players × 5 guesses + close) costs ~0.00014 SOL in fees. Tournament account rent (~1.71 SOL for 245KB program) is recoverable on close.
+
 #### Phase 3: MagicBlock VRF
 
 | Action | Fee | Notes |
@@ -249,6 +288,7 @@ Phase 2 `initialize` is a multi-instruction transaction: it creates a Switchboar
 - Off-chain data security: proof, signature, freshness checks
 - The rBPF virtual machine and its constraints
 - Anchor fundamentals: accounts, instructions, errors, and testing
+- Multi-player tournament design: PDA derivation, player entries, ranking
 
 ---
 
@@ -256,7 +296,7 @@ Phase 2 `initialize` is a multi-instruction transaction: it creates a Switchboar
 
 - **Rust** -- The programming language
 - **Anchor** -- Solana program framework
-- **Switchboard VRF** -- On-chain randomness oracle (Phase 2)
+- **Switchboard VRF** -- On-chain randomness oracle (Phase 2 & 4)
 - **MagicBlock VRF** -- Free, fast verifiable randomness (Phase 3)
 - **rand** crate -- For the CLI version only
 
