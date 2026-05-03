@@ -8,7 +8,9 @@
     "play:phase2:devnet": "npx tsx scripts/play-phase2-devnet.ts",
     "play:phase2:local": "npx tsx scripts/play-phase2-devnet.ts --local",
     "play:phase3:devnet": "npx tsx scripts/play-phase3-devnet.ts",
-    "play:phase3:local": "npx tsx scripts/play-phase3-devnet.ts --local"
+    "play:phase3:local": "npx tsx scripts/play-phase3-devnet.ts --local",
+    "play:phase4:devnet": "npx tsx scripts/play-phase4-devnet.ts",
+    "play:phase4:local": "npx tsx scripts/play-phase4-devnet.ts --local"
   },
   "dependencies": {
     "@anchor-lang/core": "^1.0.1",

@@ -9,6 +9,7 @@ skip-lint = false
 on_chain = "KXXhoaNpoXNNHCqB2YYjEBSXoUikpa2tou4haVJgvEU"
 phase2_vrf = "94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2"
 phase3_magicblock_vrf = "DnrNKTTspzjip8CAFXzCNkbMbQKXjNbZGnx6gNGtCEAH"
+phase4_tournament = "FKqXgQYFUgMifKoQTYbb5UzMLry6RDo9E6dWm6E4fKoL"
 
 [provider]
 cluster = "localnet"
