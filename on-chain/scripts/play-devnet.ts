@@ -44,9 +44,7 @@ const EXPLORER_TX = "https://explorer.solana.com/tx";
 const CLUSTER = process.argv.includes("--local")
   ? "custom&customUrl=http://localhost:8899"
   : "devnet";
-const PROGRAM_ID = new PublicKey(
-  "3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT"
-);
+const PROGRAM_ID = new PublicKey("KXXhoaNpoXNNHCqB2YYjEBSXoUikpa2tou4haVJgvEU");
 const KEYPAIR_PATH = path.join(
   process.env.HOME!,
   ".config",

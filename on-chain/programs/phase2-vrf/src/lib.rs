@@ -10,7 +10,7 @@ pub use instructions::*;
 pub use state::*;
 
 // Use a new program ID — will be replaced by `anchor build` generated keypair
-declare_id!("CHXkyr3GrLvWRXdbnYgPMKhwU1dYF6gW9aUpV8S3oTJw");
+declare_id!("94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2");
 
 #[program]
 pub mod phase2_vrf {

@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT");
+declare_id!("KXXhoaNpoXNNHCqB2YYjEBSXoUikpa2tou4haVJgvEU");
 
 #[program]
 pub mod on_chain {

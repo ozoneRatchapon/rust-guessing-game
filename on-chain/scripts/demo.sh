@@ -60,7 +60,7 @@ run_demo() {
             banner "━━━ Demo 2: Phase 1 — Commit-Reveal ━━━"
             echo
             echo -e "  ${DIM}Anchor program on devnet with admin commit-reveal${RESET}"
-            echo -e "  ${DIM}Program: 3FQq3uEM4wCzoGpxjQiYwyjjPjzbPpf98YSm2NbUuejT${RESET}"
+            echo -e "  ${DIM}Program: KXXhoaNpoXNNHCqB2YYjEBSXoUikpa2tou4haVJgvEU${RESET}"
             echo
             cd "$ROOT_DIR"
             npx tsx scripts/play-devnet.ts
@@ -70,7 +70,7 @@ run_demo() {
             banner "━━━ Demo 3: Phase 2 — Switchboard VRF ━━━"
             echo
             echo -e "  ${DIM}Anchor program on devnet with trustless VRF randomness${RESET}"
-            echo -e "  ${DIM}Program: CHXkyr3GrLvWRXdbnYgPMKhwU1dYF6gW9aUpV8S3oTJw${RESET}"
+            echo -e "  ${DIM}Program: 94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2${RESET}"
             echo
             cd "$ROOT_DIR"
             npx tsx scripts/play-phase2-devnet.ts

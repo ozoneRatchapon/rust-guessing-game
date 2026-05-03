@@ -1,5 +1,7 @@
+#[allow(unused_imports)]
+use anchor_lang::Discriminator;
 use anchor_lang::prelude::*;
-use switchboard_on_demand::Discriminator;
+use switchboard_on_demand::Discriminator as SbDiscriminator;
 use switchboard_on_demand::on_demand::accounts::RandomnessAccountData;
 
 use crate::error::GameError;

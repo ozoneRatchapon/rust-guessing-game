@@ -69,7 +69,7 @@ const CLUSTER = process.argv.includes("--local")
   ? "custom&customUrl=http://localhost:8899"
   : "devnet";
 const PROGRAM_ID = new PublicKey(
-  "CHXkyr3GrLvWRXdbnYgPMKhwU1dYF6gW9aUpV8S3oTJw"
+  "94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2"
 );
 const KEYPAIR_PATH = path.join(
   process.env.HOME!,

@@ -8,7 +8,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 
 const PROGRAM_ID = new PublicKey(
-  "CHXkyr3GrLvWRXdbnYgPMKhwU1dYF6gW9aUpV8S3oTJw"
+  "94g894DkqpuewD8mKHimaBsuzFT7Qz2E9Wb8QPWUBsZ2"
 );
 const DEVNET_URL = "https://api.devnet.solana.com";
 
@@ -48,10 +48,16 @@ async function main() {
     let instrName = "unknown";
     for (const l of logs) {
       if (l.includes("Instruction: Initialize")) instrName = "initialize";
-      if (l.includes("Instruction: SettleRandom") || l.includes("Instruction: Settle"))
+      if (
+        l.includes("Instruction: SettleRandom") ||
+        l.includes("Instruction: Settle")
+      )
         instrName = "settle_random";
       if (l.includes("Instruction: Guess")) instrName = "guess";
-      if (l.includes("Instruction: CloseGame") || l.includes("Instruction: Close"))
+      if (
+        l.includes("Instruction: CloseGame") ||
+        l.includes("Instruction: Close")
+      )
         instrName = "close_game";
     }
 
@@ -133,12 +139,8 @@ async function main() {
   }
 
   console.log("\n\nMarkdown Table for README:");
-  console.log(
-    "| Instruction | Compute Units | Fee (lamports) | Notes |"
-  );
-  console.log(
-    "|-------------|--------------:|---------------:|--------|"
-  );
+  console.log("| Instruction | Compute Units | Fee (lamports) | Notes |");
+  console.log("|-------------|--------------:|---------------:|--------|");
   for (const [instr, data] of byInstr) {
     const avgCu = Math.round(
       data.cus.reduce((a, b) => a + b, 0) / data.cus.length
@@ -149,9 +151,7 @@ async function main() {
     const note = instr.includes("multi-ix")
       ? "Includes Switchboard VRF instruction"
       : "Single instruction";
-    console.log(
-      `| ${instr} | ~${avgCu} | ${avgFee} | ${note} |`
-    );
+    console.log(`| ${instr} | ~${avgCu} | ${avgFee} | ${note} |`);
   }
 }
 
