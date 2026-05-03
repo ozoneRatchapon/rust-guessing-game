@@ -15,6 +15,7 @@
 6. [External Oracles (VRF)](#6-external-oracles-vrf)
 7. [Build, Test, Deploy](#7-build-test-deploy)
 8. [Quick-Start Checklist](#8-quick-start-checklist)
+9. [Mainnet Deployment & Key Management](#9-mainnet-deployment--key-management)
 
 ---
 
@@ -716,6 +717,172 @@ Starting a new Anchor project? Follow this order:
 
 ---
 
+## 9. Mainnet Deployment & Key Management
+
+### The Two Keypairs You MUST Understand
+
+```
+PROGRAM KEYPAIR (target/deploy/*-keypair.json)
+├── Defines the program's on-chain address
+├── Needed to deploy to that address
+└── If lost: program still runs, but address is orphaned forever
+
+UPGRADE AUTHORITY (your wallet or multisig)
+├── Can upgrade the program's bytecode
+├── Can close the program and recover SOL
+└── If lost: SOL locked FOREVER, no upgrades possible
+```
+
+### Keypair Backup Checklist
+
+**Before your first deploy — always do this first:**
+
+```bash
+# 1. Build generates keypairs in target/deploy/
+anchor build
+
+# 2. IMMEDIATELY back them up (target/ is gitignored and volatile)
+mkdir -p ~/solana-keys/devnet
+mkdir -p ~/solana-keys/mainnet
+cp target/deploy/*-keypair.json ~/solana-keys/devnet/
+
+# For mainnet: store in encrypted secrets manager
+# Options: 1Password CLI, AWS Secrets Manager, HashiCorp Vault, hardware wallet
+```
+
+**Never** rely on `target/deploy/` as your only copy.
+`cargo clean`, `git clean`, or branch switching can destroy them.
+
+### Program Lifecycle on Mainnet
+
+```
+1. Backup keypair     → encrypted storage
+2. Build              → anchor build (or solana-verify build for reproducible)
+3. Deploy             → solana program deploy (or anchor deploy)
+4. Verify             → solana-verify verify-from-repo
+5. Transfer authority → to Squads multisig
+6. (Optional) Freeze  → set-upgrade-authority --final
+```
+
+### Deploy to Mainnet
+
+```bash
+# Configure
+solana config set --url mainnet-beta
+solana balance  # Ensure enough SOL for rent + fees
+
+# Build
+anchor build
+
+# Deploy (uses keypair from target/deploy/)
+solana program deploy target/deploy/my_program.so \
+  --program-id target/deploy/my_program-keypair.json \
+  --url mainnet-beta
+
+# Check what you deployed
+solana program show <PROGRAM_ID> --url mainnet-beta
+```
+
+### Verify Your Build
+
+Proves to users that deployed bytecode matches your source code:
+
+```bash
+# Install
+cargo install solana-verify
+
+# Build in Docker for reproducible hash
+solana-verify build
+
+# Verify on-chain matches your repo
+solana-verify verify-from-repo https://github.com/you/your-project \
+  --program-id <PROGRAM_ID>
+```
+
+### Transfer Authority to Multisig (Squads)
+
+Never keep your personal wallet as upgrade authority on mainnet:
+
+```bash
+# Transfer to Squads multisig (e.g., 2-of-3 signers required)
+solana program set-upgrade-authority <PROGRAM_ID> \
+  --new-upgrade-authority <SQUADS_MULTISIG_ADDRESS> \
+  --url mainnet-beta
+```
+
+Benefits:
+- No single person can upgrade/close the program
+- Requires M-of-N signers (e.g., 2-of-3)
+- Prevents rug pulls, accidental closures, lost key disasters
+
+### Upgrade a Program (with Multisig)
+
+```bash
+# 1. Write new bytecode to a buffer
+solana program write-buffer target/deploy/my_program.so --url mainnet-beta
+# → returns BUFFER_ADDRESS
+
+# 2. Set buffer authority to multisig
+solana program set-buffer-authority <BUFFER_ADDRESS> \
+  --new-buffer-authority <SQUADS_MULTISIG_ADDRESS> \
+  --url mainnet-beta
+
+# 3. Go to Squads dashboard → create upgrade transaction with buffer address
+# 4. Multisig members sign → upgrade executes
+```
+
+### Close Program and Recover SOL
+
+```bash
+# Close a specific program
+solana program close <PROGRAM_ID> --url devnet --bypass-warning
+
+# Close ALL programs you have authority for
+solana program show --programs --url devnet
+
+# Close leftover buffer accounts from failed deploys
+solana program close --buffers --url devnet
+```
+
+**Rent estimates by program size:**
+
+| Program Size | SOL Locked (approx) |
+|-------------:|--------------------:|
+| 100 KB | ~0.7 SOL |
+| 200 KB | ~1.4 SOL |
+| 500 KB | ~3.5 SOL |
+| 1 MB | ~7.0 SOL |
+
+### Make Program Immutable (Permanent)
+
+Only do this after security audit + bug bounty period:
+
+```bash
+# Makes program PERMANENTLY unupgradeable AND unclosable
+# SOL is locked FOREVER
+solana program set-upgrade-authority <PROGRAM_ID> --final --url mainnet-beta
+```
+
+### Devnet vs Mainnet Decision Tree
+
+```
+Is this mainnet?
+├── YES
+│   ├── Program keypair → encrypted backup (1Password, Vault, HSM)
+│   ├── Upgrade authority → Squads multisig (2-of-3 or 3-of-5)
+│   ├── Build verification → solana-verify for reproducible builds
+│   ├── After audit → consider --final (immutable)
+│   └── Rent budget → ~1.4 SOL per 200KB program
+│
+└── NO (devnet/testnet)
+    ├── Program keypair → backup somewhere safe, not critical
+    ├── Upgrade authority → personal wallet is fine
+    ├── Free SOL from faucet → solana airdrop 2
+    └── Programs are disposable → close when done to practice
+```
+
+---
+
 ## Common Gotchas
 
 1. **Zero-lamport accounts disappear** in LiteSVM. Always set `lamports > 0` when mocking.
@@ -725,3 +892,5 @@ Starting a new Anchor project? Follow this order:
 5. **Account space** — use `8 + T::INIT_SPACE` (8 for discriminator). Wrong size = deserialization errors.
 6. **Feature-gated dev-deps** — put heavy test deps behind a feature flag to keep `cargo build-sbf` fast.
 7. **PDA seeds are part of security** — `seeds = [b"prefix", authority.as_ref()]` ensures only the right authority can create/access the account.
+8. **`cargo clean` deletes program keypairs** — always backup `target/deploy/*-keypair.json` BEFORE cleaning.
+9. **Program keypair ≠ upgrade authority** — losing the keypair means you can't deploy to that address again, but the program still runs. Losing the upgrade authority means SOL is locked forever.
